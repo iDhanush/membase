@@ -201,14 +201,17 @@ class Message:
         """Set the name of the message sender."""
         self._name = value
 
-    @content.setter  # type: ignore[no-redef]
+    @content.setter
     def content(self, value: Any) -> None:
         """Set the content of the message."""
         if not is_serializable(value):
-            logger.warning(
-                f"The content of {type(value)} is not serializable, which "
-                f"may cause problems.",
-            )
+            try:
+                value = str(value)
+            except Exception as e:
+                raise ValueError(
+                    f"Content of type {type(value)} is not serializable and "
+                    f"cannot be converted to string: {str(e)}"
+                )
         self._content = value
 
     @role.setter  # type: ignore[no-redef]
@@ -283,13 +286,31 @@ class Message:
         Returns:
             `dict`: The serialized dictionary.
         """
+        seen_objects = set()
+
+        def _serialize_with_cycle_detection(obj):
+            obj_id = id(obj)
+            if obj_id in seen_objects:
+                return str(obj)
+            seen_objects.add(obj_id)
+            
+            if isinstance(obj, (str, int, float, bool, type(None))):
+                return obj
+            elif isinstance(obj, (list, tuple)):
+                return [_serialize_with_cycle_detection(item) for item in obj]
+            elif isinstance(obj, dict):
+                return {str(k): _serialize_with_cycle_detection(v) for k, v in obj.items()}
+            else:
+                return str(obj)
+
         serialized_dict = {
             "__module__": self.__class__.__module__,
             "__name__": self.__class__.__name__,
         }
 
         for attr_name in self.__serialized_attrs:
-            serialized_dict[attr_name] = getattr(self, f"_{attr_name}")
+            value = getattr(self, f"_{attr_name}")
+            serialized_dict[attr_name] = _serialize_with_cycle_detection(value)
 
         return serialized_dict
 
