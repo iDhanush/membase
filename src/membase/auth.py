@@ -22,9 +22,8 @@ def create_auth(timestamp):
     verify_message = f"{timestamp}"
     return membase_chain.sign_message(verify_message)
 
-def verify_auth(task_id, agent_id, timestamp, signature):
-
-    logger.debug(f"auth time: {timestamp}, agent: {agent_id}, sign: {signature}")
+def verify_sign(agent_id, timestamp, signature):
+    logger.debug(f"sign time: {timestamp}, agent: {agent_id}, sign: {signature}")
    
     if not signature or not timestamp or not agent_id:
         raise Exception("Unauthorized")
@@ -39,12 +38,15 @@ def verify_auth(task_id, agent_id, timestamp, signature):
         logger.warning(f"{agent_id} has expired token")
         raise Exception("Token expired")
 
-    if not membase_chain.has_auth(task_id, agent_id):
-        logger.warning(f"{agent_id} is not auth on chain")
-        raise Exception("No auth on chain")
-
     agent_address = membase_chain.get_agent(agent_id)
     verify_message = f"{timestamp}"
     if not membase_chain.valid_signature(verify_message, signature, agent_address):
         logger.warning(f"{agent_id} has invalid signature")
         raise Exception("Invalid signature")
+
+def verify_auth(task_id, agent_id, timestamp, signature):
+    if not membase_chain.has_auth(task_id, agent_id):
+        logger.warning(f"{agent_id} is not auth on chain")
+        raise Exception("No auth on chain")
+
+    verify_sign(agent_id, timestamp, signature)
