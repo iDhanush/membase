@@ -5,6 +5,7 @@ ChromaDB-based implementation of KnowledgeBase
 
 import os
 import uuid
+import json
 from typing import Optional, List, Dict, Any, Union
 import chromadb
 from chromadb.config import Settings
@@ -23,6 +24,8 @@ class ChromaKnowledgeBase(KnowledgeBase):
         persist_directory: str = "./chroma_db",
         collection_name: str = "default",
         embedding_function: Optional[Any] = None,
+        hub_owner: Optional[str] = None,
+        auto_upload_to_hub: bool = False,
         **kwargs: Any,
     ):
         """
@@ -32,10 +35,16 @@ class ChromaKnowledgeBase(KnowledgeBase):
             persist_directory (str): Directory to persist the database
             collection_name (str): Name of the collection to use
             embedding_function: Custom embedding function to use
+            hub_owner: Default owner name for hub upload
+            auto_upload_to_hub: Whether to automatically upload documents to hub
             **kwargs: Additional arguments for ChromaDB client
         """
         self.persist_directory = persist_directory
         self.collection_name = collection_name
+        self.hub_owner = hub_owner
+        self.auto_upload_to_hub = auto_upload_to_hub
+        if self.auto_upload_to_hub and self.hub_owner is None:
+            raise ValueError("hub_owner must be provided if auto_upload_to_hub is True")
         
         # Ensure persistence directory exists
         os.makedirs(persist_directory, exist_ok=True)
@@ -96,6 +105,21 @@ class ChromaKnowledgeBase(KnowledgeBase):
             metadatas=metadatas
         )
     
+        
+        # Upload to hub if requested
+        if self.auto_upload_to_hub and self.hub_owner:
+            from membase.hub import hub_client
+            for doc in documents:
+                # doc as content in upload_hub
+                # doc serialized as json string in upload_hub
+                hub_client.upload_hub(
+                    owner=self.hub_owner,
+                    filename=doc.doc_id,
+                    msg=json.dumps(doc.to_dict())
+                )
+
+                
+    
     def update_documents(
         self,
         documents: Union[Document, List[Document]],
@@ -125,6 +149,16 @@ class ChromaKnowledgeBase(KnowledgeBase):
             ids.append(doc.doc_id)
             texts.append(doc.content)
             metadatas.append(doc.metadata)
+            
+            if self.auto_upload_to_hub and self.hub_owner:
+                from membase.hub import hub_client
+                # doc as content in upload_hub
+                # doc serialized as json string in upload_hub
+                hub_client.upload_hub(
+                    owner=self.hub_owner,
+                    filename=doc.doc_id,
+                    msg=json.dumps(doc.to_dict())
+                )
         
         # Update in ChromaDB
         self.collection.update(

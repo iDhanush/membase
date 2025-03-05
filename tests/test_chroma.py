@@ -26,7 +26,11 @@ def test_dir(tmp_path):
 @pytest.fixture
 def kb(test_dir):
     """Create a ChromaKnowledgeBase instance for testing."""
-    return ChromaKnowledgeBase(persist_directory=test_dir)
+    return ChromaKnowledgeBase(
+        persist_directory=test_dir,
+        hub_owner="test_user",
+        auto_upload_to_hub=True
+        )
 
 
 @pytest.fixture
