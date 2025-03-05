@@ -4,8 +4,6 @@ python sdk for membase operation
 
 ## Usage
 
-- MEMBASE_ACCOUNT is set
-
 ### install
 
 ```shell
@@ -13,7 +11,7 @@ pip install git+https://github.com/unibaseio/membase.git
 # or clone into local
 git clone https://github.com/unibaseio/membase.git
 cd membase
-pip insrall -e .
+pip install -e .
 ```
 
 ### memory
@@ -22,22 +20,41 @@ pip insrall -e .
 from membase.memory.message import Message
 from membase.memory.buffered_memory import BufferedMemory
 
-memory = BufferedMemory(persistence_in_remote=True)
+memory = BufferedMemory(membase_account="default",auto_upload_to_hub=True)
 msg = Message(
-            "agent",
-            "Hello! How can I help you?",
-            role="assistant",
-            metadata="md"
-        )
+    name = "agent9527",
+    content = "Hello! How can I help you?",
+    role="assistant",
+    metadata="help info"
+)
 memory.add(msg)
+```
+
+### knowledge
+
+```python
+from membase.knowledge.chroma import ChromaKnowledgeBase
+from membase.knowledge.document import Document
+
+kb = ChromaKnowledgeBase(
+    persist_directory="/tmp/test",
+    membase_account="default",
+    auto_upload_to_hub=True)
+doc = Document(
+    content="The quick brown fox jumps over the lazy dog.",
+    metadata={"source": "test", "date": "2025-03-05"}
+)
+kb.add_documents(doc)
 ```
 
 ### chain task
 
-- extra env
+- env
 
 ```shell
-export MEMBASE_SECRET_KEY="<agent secret key>"
+export MEMBASE_ID="<any unique string>"
+export MEMBASE_ACCOUNT="<account name, 0x...>"
+export MEMBASE_SECRET_KEY="<secret key>"
 ```
 
 ```python
