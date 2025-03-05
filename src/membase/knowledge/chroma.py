@@ -12,6 +12,8 @@ from chromadb.config import Settings
 from chromadb.utils import embedding_functions
 import numpy as np
 
+from membase.storage.hub import hub_client
+
 from .knowledge import KnowledgeBase
 from .document import Document
 
@@ -24,7 +26,7 @@ class ChromaKnowledgeBase(KnowledgeBase):
         persist_directory: str = "./chroma_db",
         collection_name: str = "default",
         embedding_function: Optional[Any] = None,
-        hub_owner: Optional[str] = None,
+        membase_account: str = "default",
         auto_upload_to_hub: bool = False,
         **kwargs: Any,
     ):
@@ -35,16 +37,14 @@ class ChromaKnowledgeBase(KnowledgeBase):
             persist_directory (str): Directory to persist the database
             collection_name (str): Name of the collection to use
             embedding_function: Custom embedding function to use
-            hub_owner: Default owner name for hub upload
+            membase_account: Default account name for hub upload
             auto_upload_to_hub: Whether to automatically upload documents to hub
             **kwargs: Additional arguments for ChromaDB client
         """
-        self.persist_directory = persist_directory
-        self.collection_name = collection_name
-        self.hub_owner = hub_owner
-        self.auto_upload_to_hub = auto_upload_to_hub
-        if self.auto_upload_to_hub and self.hub_owner is None:
-            raise ValueError("hub_owner must be provided if auto_upload_to_hub is True")
+        self._persist_directory = persist_directory
+        self._collection_name = collection_name
+        self._membase_account = membase_account
+        self._auto_upload_to_hub = auto_upload_to_hub
         
         # Ensure persistence directory exists
         os.makedirs(persist_directory, exist_ok=True)
@@ -94,6 +94,9 @@ class ChromaKnowledgeBase(KnowledgeBase):
             if not doc.metadata:
                 doc.metadata = {"source": "default"}
             
+            # add collection name to metadata
+            doc.metadata["collection"] = self._collection_name
+            
             ids.append(doc.doc_id)
             texts.append(doc.content)
             metadatas.append(doc.metadata)
@@ -105,21 +108,17 @@ class ChromaKnowledgeBase(KnowledgeBase):
             metadatas=metadatas
         )
     
-        
         # Upload to hub if requested
-        if self.auto_upload_to_hub and self.hub_owner:
-            from membase.hub import hub_client
+        if self._auto_upload_to_hub:
             for doc in documents:
                 # doc as content in upload_hub
                 # doc serialized as json string in upload_hub
                 hub_client.upload_hub(
-                    owner=self.hub_owner,
+                    owner=self._membase_account,
                     filename=doc.doc_id,
                     msg=json.dumps(doc.to_dict())
                 )
 
-                
-    
     def update_documents(
         self,
         documents: Union[Document, List[Document]],
@@ -146,16 +145,18 @@ class ChromaKnowledgeBase(KnowledgeBase):
             if not doc.metadata:
                 doc.metadata = {"source": "default"}
             
+            # add collection name to metadata
+            doc.metadata["collection"] = self._collection_name
+            
             ids.append(doc.doc_id)
             texts.append(doc.content)
             metadatas.append(doc.metadata)
             
-            if self.auto_upload_to_hub and self.hub_owner:
-                from membase.hub import hub_client
+            if self._auto_upload_to_hub:
                 # doc as content in upload_hub
                 # doc serialized as json string in upload_hub
                 hub_client.upload_hub(
-                    owner=self.hub_owner,
+                    owner=self._membase_account,
                     filename=doc.doc_id,
                     msg=json.dumps(doc.to_dict())
                 )
@@ -187,6 +188,8 @@ class ChromaKnowledgeBase(KnowledgeBase):
         query: str,
         top_k: int = 5,
         similarity_threshold: float = 0.0,
+        metadata_filter: Optional[Dict[str, Any]] = None,
+        content_filter: Optional[str] = None,
         **kwargs: Any,
     ) -> List[Document]:
         """
@@ -196,18 +199,29 @@ class ChromaKnowledgeBase(KnowledgeBase):
             query: The query string
             top_k: Number of documents to retrieve
             similarity_threshold: Minimum similarity score (0.0 to 1.0) for retrieved documents
+            metadata_filter: Dictionary of metadata fields to filter by
+            content_filter: String to filter document content
             **kwargs: Additional retrieval parameters
             
         Returns:
             List of retrieved documents
         """
-        # Add similarity threshold to query parameters
+        # Prepare query parameters
         query_params = {
             "query_texts": [query],
             "n_results": top_k,
-            "where_document": {"$contains": query} if similarity_threshold > 0 else None,
             **kwargs
         }
+        
+        # Add metadata filter if provided
+        if metadata_filter:
+            query_params["where"] = metadata_filter
+            
+        # Add content filter if provided
+        if content_filter:
+            query_params["where_document"] = {"$contains": content_filter}
+        elif similarity_threshold > 0:
+            query_params["where_document"] = {"$contains": query}
         
         results = self.collection.query(**query_params)
         
@@ -290,9 +304,9 @@ class ChromaKnowledgeBase(KnowledgeBase):
     
     def clear(self) -> None:
         """Clear all data from the knowledge base."""
-        self.client.delete_collection(self.collection_name)
+        self.client.delete_collection(self._collection_name)
         self.collection = self.client.create_collection(
-            name=self.collection_name,
+            name=self._collection_name,
             embedding_function=self.embedding_function
         )
     
@@ -306,9 +320,9 @@ class ChromaKnowledgeBase(KnowledgeBase):
         collection_info = self.collection.get()
         return {
             "num_documents": len(collection_info["ids"]),
-            "collection_name": self.collection_name,
+            "collection_name": self._collection_name,
             "embedding_function": self.embedding_function.__class__.__name__,
-            "persist_directory": self.persist_directory
+            "persist_directory": self._persist_directory
         }
     
     def find_optimal_threshold(

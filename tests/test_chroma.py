@@ -28,7 +28,7 @@ def kb(test_dir):
     """Create a ChromaKnowledgeBase instance for testing."""
     return ChromaKnowledgeBase(
         persist_directory=test_dir,
-        hub_owner="test_user",
+        membase_account="test_user",
         auto_upload_to_hub=True
         )
 
@@ -70,8 +70,8 @@ def test_initialization(test_dir):
     """Test ChromaKnowledgeBase initialization."""
     kb = ChromaKnowledgeBase(persist_directory=test_dir)
     assert os.path.exists(test_dir)
-    assert kb.collection_name == "default"
-    assert kb.persist_directory == test_dir
+    assert kb._collection_name == "default"
+    assert kb._persist_directory == test_dir
 
 
 def test_add_documents(kb, sample_documents):
@@ -210,7 +210,7 @@ def test_get_stats(kb, sample_documents):
     assert stats["num_documents"] == 3
     assert stats["collection_name"] == "default"
     assert "embedding_function" in stats
-    assert stats["persist_directory"] == kb.persist_directory
+    assert stats["persist_directory"] == kb._persist_directory
 
 
 def test_persistence(test_dir, sample_documents):
@@ -319,3 +319,50 @@ def test_find_optimal_threshold(kb, sample_documents):
     assert 0.3 <= recommendation["high_recall"] <= 0.9
     assert 0.3 <= recommendation["balanced"] <= 0.9
     assert 0.3 <= recommendation["high_precision"] <= 0.9 
+
+
+def test_retrieve_with_filters(kb, sample_documents):
+    """Test document retrieval with metadata and content filters."""
+    # Add documents
+    kb.add_documents(sample_documents)
+    
+    # Test metadata filter
+    results = kb.retrieve(
+        query="fox",
+        metadata_filter={"source": "test1"}
+    )
+    assert len(results) == 1
+    assert results[0].metadata["source"] == "test1"
+    
+    # Test content filter
+    results = kb.retrieve(
+        query="fox",
+        content_filter="lazy"
+    )
+    assert len(results) == 2
+    assert all("lazy" in doc.content.lower() for doc in results)
+    
+    # Test combined filters
+    results = kb.retrieve(
+        query="fox",
+        metadata_filter={"source": "test3"},
+        content_filter="lazy"
+    )
+    assert len(results) == 1
+    assert results[0].metadata["source"] == "test3"
+    assert "lazy" in results[0].content.lower()
+    
+    # Test filters with similarity threshold
+    results = kb.retrieve(
+        query="fox",
+        metadata_filter={"source": "test1"},
+        similarity_threshold=0.5
+    )
+    assert len(results) <= 1  # Should only return very similar documents
+    
+    # Test empty results
+    results = kb.retrieve(
+        query="fox",
+        metadata_filter={"source": "nonexistent"}
+    )
+    assert len(results) == 0 

@@ -14,7 +14,7 @@ from .memory import MemoryBase
 from .serialize import serialize, deserialize
 from .message import Message
 
-from membase.hub import hub_client
+from membase.storage.hub import hub_client
 
 class BufferedMemory(MemoryBase):
     """
@@ -23,7 +23,8 @@ class BufferedMemory(MemoryBase):
 
     def __init__(
         self,
-        persistence_in_remote: bool = False
+        membase_account: str = "default",
+        auto_upload_to_hub: bool = False
     ) -> None:
         """
         Buffered memory module for conversation.
@@ -32,15 +33,10 @@ class BufferedMemory(MemoryBase):
 
         self._messages = []
 
-        self._upload = persistence_in_remote
-
         self._conversation_id = str(uuid.uuid4())
-        membase_account = os.getenv('MEMBASE_ACCOUNT')
-        if membase_account and membase_account != "":
-            self._owner = membase_account
-        else: 
-            self._owner = self._conversation_id
-
+        self._membase_account = membase_account
+        self._auto_upload_to_hub = auto_upload_to_hub
+    
     def add(
         self,
         memories: Union[Sequence[Message], Message, None],
@@ -79,11 +75,11 @@ class BufferedMemory(MemoryBase):
                     memory_unit.metadata = {'conversation' :self._conversation_id}
                 
                 self._messages.append(memory_unit)
-                if self._upload:
+                if self._auto_upload_to_hub:
                     msg = serialize(memory_unit)
                     memory_id = self._conversation_id + "_" + str(len(self._messages)-1)
-                    logger.debug(f"Upload memory: {self._owner} {memory_id}")
-                    hub_client.upload_hub(self._owner, memory_id, msg)
+                    logger.debug(f"Upload memory: {self._membase_account} {memory_id}")
+                    hub_client.upload_hub(self._membase_account, memory_id, msg)
 
     def delete(self, index: Union[Iterable, int]) -> None:
         """

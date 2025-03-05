@@ -18,7 +18,7 @@ class BufferedMemoryTest(unittest.TestCase):
     """
 
     def setUp(self) -> None:
-        self.memory = BufferedMemory(persistence_in_remote=True)
+        self.memory = BufferedMemory(auto_upload_to_hub=True)
         self.file_name_1 = "tmp_mem_file1.txt"
         self.file_name_2 = "tmp_mem_file2.txt"
         self.Message_1 = Message("user", "Hello", role="user")

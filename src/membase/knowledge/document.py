@@ -7,7 +7,6 @@ from typing import Dict, Any, Optional
 from dataclasses import dataclass, field
 from datetime import datetime
 
-
 @dataclass
 class Document:
     """A class representing a document in the RAG system."""

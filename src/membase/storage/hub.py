@@ -3,6 +3,9 @@ import json
 import os
 from io import BytesIO
 from urllib.parse import urlencode
+import queue
+import threading
+import time
 
 import logging
 logger = logging.getLogger(__name__)
@@ -10,44 +13,75 @@ logger = logging.getLogger(__name__)
 class Client:
     def __init__(self, base_url):
         self.base_url = base_url
+        self.upload_queue = queue.Queue()
+        self.upload_thread = threading.Thread(target=self._process_upload_queue, daemon=True)
+        self.upload_thread.start()
+
+    def _process_upload_queue(self):
+        while True:
+            try:
+                upload_task = self.upload_queue.get()
+                if upload_task is None:
+                    break
+                
+                owner, filename, msg, event = upload_task
+                meme_struct = {
+                    "Owner": owner,
+                    "ID": filename,
+                    "Message": msg
+                }
+
+                meme_struct_json = json.dumps(meme_struct)
+                headers = {'Content-Type': 'application/json'}
+                
+                response = requests.post(f"{self.base_url}/api/upload", headers=headers, data=meme_struct_json)
+                response.raise_for_status()
+                
+                res = response.json()
+                logger.debug(f"Upload done: {res}")
+                
+                event.set()
+                
+            except requests.RequestException as err:
+                logger.error(f"Error during upload: {err}")
+            except Exception as e:
+                logger.error(f"Unexpected error in upload queue processing: {e}")
+            finally:
+                self.upload_queue.task_done()
+                time.sleep(0.1)
 
     def initialize(self, base_url):
         if self.base_url is None:
             self.base_url = base_url
 
-    def upload_hub(self, owner, filename, msg):
-        """Upload meme message to the hub server."""
-        try:
-            # Create the meme structure as a dictionary
-            meme_struct = {
-                "Owner": owner,
-                "ID": filename,
-                "Message": msg
-            }
-
-            # Serialize the meme structure to JSON
-            meme_struct_json = json.dumps(meme_struct)
-
-            # Set the headers for the request
-            headers = {'Content-Type': 'application/json'}
+    def upload_hub(self, owner, filename, msg, wait=True):
+        """Add upload task to queue, optionally wait for completion
+        
+        Args:
+            owner: Owner of the meme
+            filename: Name of the file
+            msg: Message content
+            wait: Whether to wait for upload completion
             
-            # Send the POST request to the API
-            response = requests.post(f"{self.base_url}/api/upload", headers=headers, data=meme_struct_json)
-
-            # Raise an exception if the request was not successful
-            response.raise_for_status()
-
-            # Parse the response JSON into a dictionary
-            res = response.json()
-
-            # Log the upload completion
-            logger.debug(f"Upload done: {res}")
-
-            # Optionally return the response if needed
-            return res
-
-        except requests.RequestException as err:
-            logger.error(f"Error during upload: {err}")
+        Returns:
+            If wait=True, returns upload result; if wait=False, returns queue status
+        """
+        try:
+            # Create an event object for synchronization
+            event = threading.Event()
+            # Add upload task and event object to queue
+            self.upload_queue.put((owner, filename, msg, event))
+            logger.debug(f"Upload task queued: {owner}/{filename}")
+            
+            if wait:
+                # Wait for upload completion
+                event.wait()
+                return {"status": "completed", "message": "Upload task completed"}
+            else:
+                return {"status": "queued", "message": "Upload task has been queued"}
+                
+        except Exception as e:
+            logger.error(f"Error queueing upload task: {e}")
             return None
 
     def upload_hub_data(self, owner, filename, data):
@@ -110,6 +144,10 @@ class Client:
         except requests.RequestException as err:
             logger.error(f"Error during download: {err}")
             return None
-  
+
+    def wait_for_upload_queue(self):
+        """Wait for all tasks in the upload queue to complete"""
+        self.upload_queue.join()
+
 he = os.getenv('MEMBASE_HUB', 'http://54.151.130.2:8080')      
 hub_client = Client(he)
