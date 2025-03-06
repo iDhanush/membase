@@ -5,8 +5,11 @@ setup(
     version="0.1.0",
     packages=find_packages(where="src"),
     package_dir={"": "src"},
+    package_data={
+        "membase": ["chain/solc/*.json"],
+    },
 
-    description="Add your description here",
+    description="python sdk for membase operation: memory, knowledge, chain, auth etc.",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
     author="",
