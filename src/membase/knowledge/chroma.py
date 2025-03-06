@@ -17,7 +17,6 @@ from membase.storage.hub import hub_client
 from .knowledge import KnowledgeBase
 from .document import Document
 
-
 class ChromaKnowledgeBase(KnowledgeBase):
     """ChromaDB-based implementation of KnowledgeBase."""
     
@@ -128,6 +127,10 @@ class ChromaKnowledgeBase(KnowledgeBase):
         
         Args:
             documents: Single document or list of documents to update
+            
+        Raises:
+            ValueError: If document has no valid doc_id
+            KeyError: If document ID does not exist in the collection
         """
         if isinstance(documents, Document):
             documents = [documents]
@@ -161,12 +164,20 @@ class ChromaKnowledgeBase(KnowledgeBase):
                     msg=json.dumps(doc.to_dict())
                 )
         
-        # Update in ChromaDB
-        self.collection.update(
-            ids=ids,
-            documents=texts,
-            metadatas=metadatas
-        )
+        try:
+            # Update in ChromaDB
+            self.collection.update(
+                ids=ids,
+                documents=texts,
+                metadatas=metadatas
+            )
+        except ValueError as e:
+            # Check which IDs don't exist
+            existing_ids = set(self.collection.get()["ids"])
+            non_existent_ids = [id for id in ids if id not in existing_ids]
+            if non_existent_ids:
+                raise KeyError(f"Documents with IDs {non_existent_ids} do not exist in the collection")
+            raise e
     
     def delete_documents(
         self,
@@ -182,6 +193,29 @@ class ChromaKnowledgeBase(KnowledgeBase):
             document_ids = [document_ids]
             
         self.collection.delete(ids=document_ids)
+    
+    def exists(self, document_ids: Union[str, List[str]]) -> Union[bool, List[bool]]:
+        """
+        Check if document IDs exist in the collection.
+        
+        Args:
+            document_ids: Single document ID or list of document IDs to check
+            
+        Returns:
+            If a single ID is provided, returns a boolean indicating if it exists.
+            If a list of IDs is provided, returns a list of booleans indicating which IDs exist.
+        """
+        if isinstance(document_ids, str):
+            document_ids = [document_ids]
+            
+        # Get all existing IDs from the collection
+        existing_ids = set(self.collection.get()["ids"])
+        
+        # Check existence for each ID
+        if len(document_ids) == 1:
+            return document_ids[0] in existing_ids
+        else:
+            return [id in existing_ids for id in document_ids]
     
     def retrieve(
         self,
@@ -199,7 +233,8 @@ class ChromaKnowledgeBase(KnowledgeBase):
             query: The query string
             top_k: Number of documents to retrieve
             similarity_threshold: Minimum similarity score (0.0 to 1.0) for retrieved documents
-            metadata_filter: Dictionary of metadata fields to filter by
+            metadata_filter: Dictionary of metadata fields to filter by, using ChromaDB operators
+                           e.g. {"field": {"$eq": "value"}}
             content_filter: String to filter document content
             **kwargs: Additional retrieval parameters
             
@@ -215,7 +250,19 @@ class ChromaKnowledgeBase(KnowledgeBase):
         
         # Add metadata filter if provided
         if metadata_filter:
-            query_params["where"] = metadata_filter
+            # Convert simple key-value pairs to ChromaDB operator format
+            conditions = []
+            for key, value in metadata_filter.items():
+                if isinstance(value, dict):
+                    conditions.append({key: value})
+                else:
+                    conditions.append({key: {"$eq": value}})
+            
+            # Combine conditions with $and operator
+            if len(conditions) == 1:
+                query_params["where"] = conditions[0]
+            else:
+                query_params["where"] = {"$and": conditions}
             
         # Add content filter if provided
         if content_filter:
@@ -241,36 +288,6 @@ class ChromaKnowledgeBase(KnowledgeBase):
             documents.append(doc)
             
         return documents
-    
-    def generate(
-        self,
-        query: str,
-        context: Optional[List[Document]] = None,
-        **kwargs: Any,
-    ) -> str:
-        """
-        Generate a response based on the query and context.
-        
-        Args:
-            query: The input query
-            context: Optional list of relevant documents
-            **kwargs: Additional generation parameters
-            
-        Returns:
-            Generated response
-        """
-        # Retrieve relevant documents if no context provided
-        if context is None:
-            context = self.retrieve(query, top_k=3)
-            
-        # Build prompt
-        prompt = f"Query: {query}\n\nContext:\n"
-        for doc in context:
-            prompt += f"- {doc.content}\n"
-            
-        # TODO: Implement actual generation logic
-        # This should integrate with an LLM to generate responses
-        return f"Generated response for query: {query}"
     
     def load(
         self,

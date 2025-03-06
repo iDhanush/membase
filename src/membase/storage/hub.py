@@ -54,7 +54,7 @@ class Client:
         if self.base_url is None:
             self.base_url = base_url
 
-    def upload_hub(self, owner, filename, msg, wait=True):
+    def upload_hub(self, owner, filename, msg, wait=False):
         """Add upload task to queue, optionally wait for completion
         
         Args:

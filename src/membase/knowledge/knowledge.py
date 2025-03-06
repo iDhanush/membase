@@ -19,11 +19,10 @@ class KnowledgeBase(ABC):
         documents: Union[Document, List[Document]],
     ) -> None:
         """
-        Add documents to the RAG system's knowledge base.
+        Add documents to the knowledge base.
         
         Args:
-            documents (Union[Document, List[Document]]):
-                Single document or list of documents to be added.
+            documents: Single document or list of documents to add
         """
 
     @abstractmethod
@@ -35,9 +34,7 @@ class KnowledgeBase(ABC):
         Update existing documents in the knowledge base.
         
         Args:
-            documents (Union[Document, List[Document]]):
-                Single document or list of documents to be updated.
-                Documents must have valid doc_id.
+            documents: Single document or list of documents to update
         """
 
     @abstractmethod
@@ -49,54 +46,26 @@ class KnowledgeBase(ABC):
         Delete documents from the knowledge base.
         
         Args:
-            document_ids (Union[str, List[str]]):
-                Single document ID or list of document IDs to delete.
+            document_ids: Single document ID or list of document IDs to delete
         """
 
     @abstractmethod
     def retrieve(
         self,
         query: str,
-        top_k: int = 5,
+        top_k: int = 3,
         **kwargs: Any,
     ) -> List[Document]:
         """
-        Retrieve relevant documents for a given query.
+        Retrieve relevant documents for a query.
         
         Args:
-            query (str):
-                The query string to search for.
-            top_k (int):
-                Number of most relevant documents to return.
-            **kwargs:
-                Additional retrieval parameters.
-                
+            query: The input query
+            top_k: Number of documents to retrieve
+            **kwargs: Additional retrieval parameters
+            
         Returns:
-            List[Document]:
-                List of retrieved documents.
-        """
-
-    @abstractmethod
-    def generate(
-        self,
-        query: str,
-        context: Optional[List[Document]] = None,
-        **kwargs: Any,
-    ) -> str:
-        """
-        Generate a response based on the query and optional context.
-        
-        Args:
-            query (str):
-                The input query.
-            context (Optional[List[Document]]):
-                Optional list of relevant documents as context.
-            **kwargs:
-                Additional generation parameters.
-                
-        Returns:
-            str:
-                Generated response.
+            List of relevant documents
         """
 
     @abstractmethod

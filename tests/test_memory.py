@@ -117,6 +117,41 @@ class BufferedMemoryTest(unittest.TestCase):
             serialize([user_input, agent_input]),
         )
 
+    def test_get_by_name(self) -> None:
+        """Test retrieving memories by name using filter_func"""
+        # Add messages with different names
+        self.memory.add([
+            Message("user1", "Hello from user1", role="user"),
+            Message("user2", "Hello from user2", role="user"),
+            Message("user1", "Another message from user1", role="user"),
+            Message("agent", "Response from agent", role="assistant")
+        ])
+        
+        # Test getting all messages from user1 using filter_func
+        def name_filter(_, memory):
+            return memory.name == "user1"
+        user1_messages = self.memory.get(filter_func=name_filter)
+        self.assertEqual(len(user1_messages), 2)
+        self.assertTrue(all(msg.name == "user1" for msg in user1_messages))
+        
+        # Test getting recent messages from user1
+        recent_user1 = self.memory.get(recent_n=2, filter_func=name_filter)
+        self.assertEqual(len(recent_user1), 1)
+        self.assertEqual(recent_user1[0].content, "Another message from user1")
+        
+        # Test getting messages from non-existent name
+        def nonexistent_filter(_, memory):
+            return memory.name == "nonexistent"
+        empty_messages = self.memory.get(filter_func=nonexistent_filter)
+        self.assertEqual(len(empty_messages), 0)
+        
+        # Test getting messages from agent
+        def agent_filter(_, memory):
+            return memory.name == "agent"
+        agent_messages = self.memory.get(filter_func=agent_filter)
+        self.assertEqual(len(agent_messages), 1)
+        self.assertEqual(agent_messages[0].content, "Response from agent")
+
 
 if __name__ == "__main__":
     unittest.main()

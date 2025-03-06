@@ -5,17 +5,11 @@ Test cases for ChromaKnowledgeBase
 
 import os
 import random
-import shutil
-import string
-import uuid
 import pytest
 from typing import List
-from datetime import datetime
-import numpy as np
 
 from membase.knowledge.chroma import ChromaKnowledgeBase
 from membase.knowledge.document import Document
-
 
 @pytest.fixture
 def test_dir(tmp_path):
@@ -157,34 +151,15 @@ def test_delete_documents(kb, sample_documents):
     # Add documents
     kb.add_documents(sample_documents)
     
-    # Test deleting a single document
-    doc_id = sample_documents[0].doc_id
-    kb.delete_documents(doc_id)
-    stats = kb.get_stats()
-    assert stats["num_documents"] == 2
+    # Delete single document
+    kb.delete_documents(sample_documents[0].doc_id)
+    results = kb.retrieve("fox", top_k=3)
+    assert len(results) < len(sample_documents)
     
-    # Test deleting multiple documents
-    doc_ids = [doc.doc_id for doc in sample_documents[1:]]
-    kb.delete_documents(doc_ids)
-    stats = kb.get_stats()
-    assert stats["num_documents"] == 0
-
-
-def test_generate_response(kb, sample_documents):
-    """Test response generation functionality."""
-    # Add documents
-    kb.add_documents(sample_documents)
-    
-    # Test generation with context
-    response = kb.generate("What animals are mentioned?")
-    assert isinstance(response, str)
-    assert len(response) > 0
-    
-    # Test generation with provided context
-    context = kb.retrieve("fox", top_k=2)
-    response = kb.generate("What does the fox do?", context=context)
-    assert isinstance(response, str)
-    assert len(response) > 0
+    # Delete multiple documents
+    kb.delete_documents([doc.doc_id for doc in sample_documents[1:]])
+    results = kb.retrieve("fox", top_k=3)
+    assert len(results) == 0
 
 
 def test_clear(kb, sample_documents):

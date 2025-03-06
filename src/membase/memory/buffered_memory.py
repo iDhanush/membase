@@ -23,6 +23,7 @@ class BufferedMemory(MemoryBase):
 
     def __init__(
         self,
+        conversation_id: Optional[str] = None,
         membase_account: str = "default",
         auto_upload_to_hub: bool = False
     ) -> None:
@@ -33,7 +34,11 @@ class BufferedMemory(MemoryBase):
 
         self._messages = []
 
-        self._conversation_id = str(uuid.uuid4())
+        if conversation_id is None:
+            self._conversation_id = str(uuid.uuid4())
+        else:
+            self._conversation_id = conversation_id
+
         self._membase_account = membase_account
         self._auto_upload_to_hub = auto_upload_to_hub
     
