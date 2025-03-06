@@ -4,6 +4,7 @@ Memory module for conversation
 """
 
 import json
+import logging
 import os
 import uuid
 from typing import Iterable, Sequence, Optional, Union, Callable
@@ -83,7 +84,7 @@ class BufferedMemory(MemoryBase):
                 if self._auto_upload_to_hub:
                     msg = serialize(memory_unit)
                     memory_id = self._conversation_id + "_" + str(len(self._messages)-1)
-                    logger.debug(f"Upload memory: {self._membase_account} {memory_id}")
+                    logging.debug(f"Upload memory: {self._membase_account} {memory_id}")
                     hub_client.upload_hub(self._membase_account, memory_id, msg)
 
     def delete(self, index: Union[Iterable, int]) -> None:

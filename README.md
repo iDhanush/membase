@@ -1,6 +1,6 @@
 # membase
 
-python sdk for membase operation
+python sdk for membase operation: memory, knowledge, chain, auth etc.
 
 ## Usage
 
