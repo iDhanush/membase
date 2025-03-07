@@ -1,10 +1,12 @@
 import unittest
 from typing import List
 import uuid
+from unittest.mock import patch, MagicMock
 
 from membase.memory.multi_memory import MultiMemory
 from membase.memory.message import Message
 
+@patch('membase.memory.multi_memory.hub_client')
 class TestMultiMemory(unittest.TestCase):
     def setUp(self):
         """Set up test fixtures before each test method."""
@@ -47,7 +49,7 @@ class TestMultiMemory(unittest.TestCase):
         
         # Test with specific conversation
         conv_id = "test_conv"
-        self.multi_memory.add(conversation_id=conv_id, memories=self.test_message)
+        self.multi_memory.add(memories=self.test_message, conversation_id=conv_id)
         memories = self.multi_memory.get(conversation_id=conv_id)
         self.assertEqual(len(memories), 1)
         self.assertEqual(memories[0].content, "test content")
@@ -74,15 +76,15 @@ class TestMultiMemory(unittest.TestCase):
     def test_clear_specific_conversation(self):
         """Test clearing specific conversation"""
         conv_id = "test_conv"
-        self.multi_memory.add(conversation_id=conv_id, memories=self.test_message)
+        self.multi_memory.add(memories=self.test_message, conversation_id=conv_id)
         self.multi_memory.clear(conversation_id=conv_id)
         self.assertEqual(self.multi_memory.size(conversation_id=conv_id), 0)
         
     def test_clear_all_conversations(self):
         """Test clearing all conversations"""
         # Add memories to different conversations
-        self.multi_memory.add(conversation_id="conv1", memories=self.test_message)
-        self.multi_memory.add(conversation_id="conv2", memories=self.test_message)
+        self.multi_memory.add(memories=self.test_message, conversation_id="conv1")
+        self.multi_memory.add(memories=self.test_message, conversation_id="conv2")
         
         self.multi_memory.clear()
         self.assertEqual(self.multi_memory.size(), 0)
@@ -92,7 +94,7 @@ class TestMultiMemory(unittest.TestCase):
         """Test getting all conversation IDs"""
         conv_ids = ["conv1", "conv2", "conv3"]
         for conv_id in conv_ids:
-            self.multi_memory.add(conversation_id=conv_id, memories=self.test_message)
+            self.multi_memory.add(memories=self.test_message, conversation_id=conv_id)
             
         all_convs = self.multi_memory.get_all_conversations()
         self.assertEqual(len(all_convs), len(conv_ids))
@@ -157,6 +159,65 @@ class TestMultiMemory(unittest.TestCase):
         for msg in user_messages:
             self.assertEqual(msg.role, "user")
             self.assertEqual(msg.name, "test_user")
+
+    def test_load_from_hub(self, mock_hub_client):
+        """Test loading memories from hub for a specific conversation"""
+        # Prepare test data
+        conv_id = "test_conv"
+        test_memories = [
+            Message(content="hub message 1", role="user", name="test_user"),
+            Message(content="hub message 2", role="assistant", name="assistant")
+        ]
+        mock_hub_client.load_from_hub.return_value = test_memories
+        
+        # Test loading with specific conversation ID
+        self.multi_memory.load_from_hub(conv_id)
+        mock_hub_client.load_from_hub.assert_called_with(
+            "test_account", conv_id, self.multi_memory.get_memory(conv_id), False
+        )
+        
+        # Test loading with default conversation ID
+        self.multi_memory.load_from_hub()
+        mock_hub_client.load_from_hub.assert_called_with(
+            "test_account", 
+            self.multi_memory.default_conversation_id,
+            self.multi_memory.get_memory(),
+            False
+        )
+        
+        # Test loading with overwrite=True
+        self.multi_memory.load_from_hub(conv_id, overwrite=True)
+        mock_hub_client.load_from_hub.assert_called_with(
+            "test_account", conv_id, self.multi_memory.get_memory(conv_id), True
+        )
+        
+    def test_load_all_from_hub(self, mock_hub_client):
+        """Test loading all memories from hub"""
+        # Prepare test data
+        test_conversations = ["conv1", "conv2", "conv3"]
+        mock_hub_client.list_conversations.return_value = test_conversations
+        
+        # Test loading all conversations
+        self.multi_memory.load_all_from_hub()
+        
+        # Verify list_conversations was called
+        mock_hub_client.list_conversations.assert_called_once_with("test_account")
+        
+        # Verify load_from_hub was called for each conversation
+        self.assertEqual(mock_hub_client.load_from_hub.call_count, len(test_conversations))
+        for conv_id in test_conversations:
+            mock_hub_client.load_from_hub.assert_any_call(
+                "test_account", conv_id, self.multi_memory.get_memory(conv_id), False
+            )
+            
+        # Test loading all conversations with overwrite=True
+        mock_hub_client.load_from_hub.reset_mock()
+        self.multi_memory.load_all_from_hub(overwrite=True)
+        
+        for conv_id in test_conversations:
+            mock_hub_client.load_from_hub.assert_any_call(
+                "test_account", conv_id, self.multi_memory.get_memory(conv_id), True
+            )
 
 if __name__ == '__main__':
     unittest.main() 

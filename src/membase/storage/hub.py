@@ -117,13 +117,50 @@ class Client:
             logger.error(f"Error during upload: {err}")
             return None
 
-    def download_hub_data(self, owner, filename):
+    def list_conversations(self, owner):
+        """List all conversations for a given owner."""
+        # Prepare the form data (URL-encoded parameters)
+        form_data = {
+            'owner': owner,
+        }
+            
+        # URL encode the form data
+        encoded_form = urlencode(form_data)
+        
+        try:    
+            response = requests.post(f"{self.base_url}/api/conversation", data=encoded_form, headers={'Content-Type': 'application/x-www-form-urlencoded'})
+            response.raise_for_status()
+            return response.json()
+        except requests.RequestException as err:
+            logger.error(f"Error during list conversations: {err}")
+            return None
+    
+    def get_conversation(self, owner, conversation_id):
+        """Get a conversation for a given owner and conversation id."""
+        # Prepare the form data (URL-encoded parameters)
+        form_data = {
+            'owner': owner,
+            'id': conversation_id,
+        }
+            
+        # URL encode the form data
+        encoded_form = urlencode(form_data)
+        
+        try:    
+            response = requests.post(f"{self.base_url}/api/conversation", data=encoded_form, headers={'Content-Type': 'application/x-www-form-urlencoded'})
+            response.raise_for_status()
+            return response.json()
+        except requests.RequestException as err:
+            logger.error(f"Error during get conversation: {err}")
+            return None
+
+    def download_hub(self, owner, filename):
         """Download meme data from the hub server."""
         try:
             # Prepare the form data (URL-encoded parameters)
             form_data = {
                 'id': filename,
-                'owner': owner
+                'owner': owner,
             }
             
             # URL encode the form data

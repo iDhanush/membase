@@ -3,17 +3,26 @@
 MultiMemory module for managing multiple BufferedMemory instances
 """
 
+import json
+import logging
 from typing import Optional, Dict, List, Union, Callable
 import uuid
 from .buffered_memory import BufferedMemory
 from .message import Message
+
+from membase.storage.hub import hub_client
 
 class MultiMemory:
     """
     A class that manages multiple BufferedMemory instances, distinguished by conversation_id
     """
     
-    def __init__(self, membase_account: str = "default", auto_upload_to_hub: bool = False, default_conversation_id: Optional[str] = None):
+    def __init__(self, 
+                 membase_account: str = "default", 
+                 auto_upload_to_hub: bool = False, 
+                 default_conversation_id: Optional[str] = None,
+                 preload_from_hub: bool = False
+                 ):
         """
         Initialize MultiMemory
 
@@ -21,12 +30,15 @@ class MultiMemory:
             membase_account (str): The membase account name
             auto_upload_to_hub (bool): Whether to automatically upload to hub
             default_conversation_id (Optional[str]): The default conversation ID. If None, generates a new UUID.
+            preload_from_hub (bool): Whether to preload from hub
         """
         self._memories: Dict[str, BufferedMemory] = {}
         self._membase_account = membase_account
         self._auto_upload_to_hub = auto_upload_to_hub
         self._default_conversation_id = default_conversation_id or str(uuid.uuid4())
-        
+        if preload_from_hub:
+            self.load_all_from_hub()
+            
     def update_conversation_id(self, conversation_id: Optional[str] = None) -> None:
         """
         Update the default conversation ID. If conversation_id is None, generates a new UUID.
@@ -58,13 +70,13 @@ class MultiMemory:
             )
         return self._memories[conversation_id]
     
-    def add(self, conversation_id: Optional[str] = None, memories: Union[List[Message], Message, None] = None) -> None:
+    def add(self, memories: Union[List[Message], Message, None], conversation_id: Optional[str] = None) -> None:
         """
         Add memories to the specified conversation
 
         Args:
-            conversation_id (Optional[str]): The conversation ID. If None, uses default ID.
             memories: The memories to add
+            conversation_id (Optional[str]): The conversation ID. If None, uses default ID.
         """
         memory = self.get_memory(conversation_id)
         memory.add(memories)
@@ -148,3 +160,33 @@ class MultiMemory:
             str: The default conversation ID
         """
         return self._default_conversation_id
+
+    def load_from_hub(self, conversation_id: str) -> None:
+        """
+        Load memories from hub for the specified conversation.
+
+        Args:
+            conversation_id (str): The conversation ID to load.
+        """
+        memory = self.get_memory(conversation_id)
+        msgstrings = hub_client.get_conversation(self._membase_account, conversation_id)
+        for msgstring in msgstrings:
+            try:
+                logging.debug("got msg:", msgstring)
+                json_msg = json.loads(msgstring)
+                msg = Message.from_dict(json_msg)
+                memory.add_with_upload(msg, False)
+            except Exception as e:
+                logging.error(f"Error loading message: {e}")
+        
+    def load_all_from_hub(self) -> None:
+        """
+        Load all memories from hub for all conversations under the current account.
+
+        Args:
+            overwrite (bool): Whether to overwrite existing memories
+        """
+        conversations = hub_client.list_conversations(self._membase_account)
+        logging.info("remote conversations:", conversations)
+        for conv_id in conversations:
+            self.load_from_hub(conv_id)

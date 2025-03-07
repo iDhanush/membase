@@ -34,6 +34,7 @@ class BufferedMemory(MemoryBase):
         super().__init__()
 
         self._messages = []
+        self._message_map = {}  # 使用字典存储消息ID到索引的映射
 
         if conversation_id is None:
             self._conversation_id = str(uuid.uuid4())
@@ -49,6 +50,17 @@ class BufferedMemory(MemoryBase):
     ) -> None:
         """
         Adding new memory fragment, depending on how the memory are stored
+        """
+        print("add:", self._conversation_id, memories)
+        self.add_with_upload(memories, True)
+
+    def add_with_upload(
+        self,
+        memories: Union[Sequence[Message], Message, None],
+        upload_to_hub: bool = True,
+    ) -> None:
+        """
+        Adding new memory fragment, depending on how the memory are stored
         Args:
             memories (`Union[Sequence[Message], Message, None]`):
                 Memories to be added.
@@ -61,31 +73,37 @@ class BufferedMemory(MemoryBase):
         else:
             record_memories = memories
 
-        # FIXME: a single message may be inserted multiple times
-        # Assert the message types
-        memories_idx = set(_.id for _ in self._messages if hasattr(_, "id"))
+        # Assert the message types and check for duplicates using dict
         for memory_unit in record_memories:
             if not isinstance(memory_unit, Message):
                 raise ValueError(
                     f"Cannot add {type(memory_unit)} to memory, "
                     f"must be a Message object.",
                 )
+            
+            # Skip if message already exists
+            if hasattr(memory_unit, "id") and memory_unit.id in self._message_map:
+                logging.warn("duplicate memory_unit:", memory_unit.id)
+                continue
 
-            # Add to memory if it's new
-            if memory_unit.id not in memories_idx:
-                if isinstance(memory_unit.metadata, dict):
-                    memory_unit.metadata["conversation"] = self._conversation_id
-                if isinstance(memory_unit.metadata, str):
-                    memory_unit.metadata = {'metadata': memory_unit.metadata, 'conversation' :self._conversation_id}
-                else:
-                    memory_unit.metadata = {'conversation' :self._conversation_id}
-                
-                self._messages.append(memory_unit)
-                if self._auto_upload_to_hub:
-                    msg = serialize(memory_unit)
-                    memory_id = self._conversation_id + "_" + str(len(self._messages)-1)
-                    logging.debug(f"Upload memory: {self._membase_account} {memory_id}")
-                    hub_client.upload_hub(self._membase_account, memory_id, msg)
+            # Add metadata
+            if isinstance(memory_unit.metadata, dict):
+                memory_unit.metadata["conversation"] = self._conversation_id
+            elif isinstance(memory_unit.metadata, str):
+                memory_unit.metadata = {'metadata': memory_unit.metadata, 'conversation': self._conversation_id}
+            else:
+                memory_unit.metadata = {'conversation': self._conversation_id}
+            
+            # Add to memory and update map
+            self._messages.append(memory_unit)
+            self._message_map[memory_unit.id] = len(self._messages) - 1
+
+            # Upload to hub if needed
+            if self._auto_upload_to_hub and upload_to_hub:
+                msg = serialize(memory_unit)
+                memory_id = self._conversation_id + "_" + str(len(self._messages)-1)
+                logging.debug(f"Upload memory: {self._membase_account} {memory_id}")
+                hub_client.upload_hub(self._membase_account, memory_id, msg)
 
     def delete(self, index: Union[Iterable, int]) -> None:
         """
@@ -115,9 +133,17 @@ class BufferedMemory(MemoryBase):
                     f"index {invalid_index}",
                 )
 
-            self._messages = [
-                _ for i, _ in enumerate(self._messages) if i not in index
-            ]
+            # Update message map before deleting messages
+            new_messages = []
+            new_message_map = {}
+            for i, msg in enumerate(self._messages):
+                if i not in index:
+                    new_messages.append(msg)
+                    if hasattr(msg, "id"):
+                        new_message_map[msg.id] = len(new_messages) - 1
+
+            self._messages = new_messages
+            self._message_map = new_message_map
         else:
             raise NotImplementedError(
                 "index type only supports {None, int, list}",
@@ -255,11 +281,12 @@ class BufferedMemory(MemoryBase):
                 else: 
                     self._owner = self._conversation_id 
 
-        self.add(load_memories)
+        self.add_with_upload(load_memories, False)
 
     def clear(self) -> None:
         """Clean memory, depending on how the memory are stored"""
         self._messages = []
+        self._message_map = {}
         self._conversation_id = str(uuid.uuid4())
         membase_account = os.getenv('MEMBASE_ACCOUNT')
         if membase_account and membase_account != "":
