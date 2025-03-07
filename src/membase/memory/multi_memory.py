@@ -174,8 +174,12 @@ class MultiMemory:
             try:
                 logging.debug("got msg:", msgstring)
                 json_msg = json.loads(msgstring)
-                msg = Message.from_dict(json_msg)
-                memory.add_with_upload(msg, False)
+                # check json_msg is a Message dict
+                if isinstance(json_msg, dict) and "id" in json_msg and "name" in json_msg:
+                    msg = Message.from_dict(json_msg)
+                    memory.add_with_upload(msg, False)
+                else:
+                    logging.debug("invalid message format:", json_msg)
             except Exception as e:
                 logging.error(f"Error loading message: {e}")
         
@@ -187,6 +191,9 @@ class MultiMemory:
             overwrite (bool): Whether to overwrite existing memories
         """
         conversations = hub_client.list_conversations(self._membase_account)
-        logging.info("remote conversations:", conversations)
-        for conv_id in conversations:
-            self.load_from_hub(conv_id)
+        if conversations and isinstance(conversations, list):
+            logging.info("remote conversations:", conversations)
+            for conv_id in conversations:
+                self.load_from_hub(conv_id)
+        else:
+            logging.warning("no conversations found")
