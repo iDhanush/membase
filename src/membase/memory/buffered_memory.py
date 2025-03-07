@@ -51,7 +51,6 @@ class BufferedMemory(MemoryBase):
         """
         Adding new memory fragment, depending on how the memory are stored
         """
-        print("add:", self._conversation_id, memories)
         self.add_with_upload(memories, True)
 
     def add_with_upload(
@@ -169,13 +168,7 @@ class BufferedMemory(MemoryBase):
             memories = self._messages
         else:
             if recent_n > self.size():
-                logger.warning(
-                    "The retrieved number of memories {} is "
-                    "greater than the total number of memories {"
-                    "}",
-                    recent_n,
-                    self.size(),
-                )
+                recent_n = self.size()
             memories = self._messages[-recent_n:]
 
         # filter the memories
