@@ -14,24 +14,6 @@ cd membase
 pip install -e .
 ```
 
-### memory
-
-- single memory instance, support upload to storage hub
-
-```python
-from membase.memory.message import Message
-from membase.memory.buffered_memory import BufferedMemory
-
-memory = BufferedMemory(membase_account="default",auto_upload_to_hub=True)
-msg = Message(
-    name = "agent9527",
-    content = "Hello! How can I help you?",
-    role="assistant",
-    metadata="help info"
-)
-memory.add(msg)
-```
-
 ### multi-memory
 
 - support conversation switch
@@ -53,9 +35,30 @@ msg = Message(
     metadata="help info"
 )
 
+# switch to
 conversation_id='your_conversation'
 mm.add(msg, conversation_id)
 ```
+
+### memory
+
+- single memory instance, support upload to storage hub
+
+```python
+from membase.memory.message import Message
+from membase.memory.buffered_memory import BufferedMemory
+
+memory = BufferedMemory(membase_account="default",auto_upload_to_hub=True)
+msg = Message(
+    name = "agent9527",
+    content = "Hello! How can I help you?",
+    role="assistant",
+    metadata="help info"
+)
+memory.add(msg)
+```
+
+
 
 ### knowledge
 
