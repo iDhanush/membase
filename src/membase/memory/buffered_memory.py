@@ -34,9 +34,10 @@ class BufferedMemory(MemoryBase):
         super().__init__()
 
         self._messages = []
-        self._message_map = {}  # 使用字典存储消息ID到索引的映射
+        self._message_map = {} 
 
-        if conversation_id is None:
+        # conversation_id is none or empty, generate a new uuid
+        if not conversation_id:
             self._conversation_id = str(uuid.uuid4())
         else:
             self._conversation_id = conversation_id

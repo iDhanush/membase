@@ -59,7 +59,7 @@ class MultiMemory:
         Returns:
             BufferedMemory: The corresponding memory instance
         """
-        if conversation_id is None:
+        if not conversation_id:
             conversation_id = self._default_conversation_id
             
         if conversation_id not in self._memories:
@@ -170,6 +170,8 @@ class MultiMemory:
         """
         memory = self.get_memory(conversation_id)
         msgstrings = hub_client.get_conversation(self._membase_account, conversation_id)
+        if msgstrings is None:
+            return 
         for msgstring in msgstrings:
             try:
                 logging.debug("got msg:", msgstring)

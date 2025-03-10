@@ -54,7 +54,7 @@ class Client:
         if self.base_url is None:
             self.base_url = base_url
 
-    def upload_hub(self, owner, filename, msg, wait=False):
+    def upload_hub(self, owner, filename, msg, wait=True):
         """Add upload task to queue, optionally wait for completion
         
         Args:
@@ -186,5 +186,5 @@ class Client:
         """Wait for all tasks in the upload queue to complete"""
         self.upload_queue.join()
 
-he = os.getenv('MEMBASE_HUB', 'http://54.151.130.2:8080')      
+he = os.getenv('MEMBASE_HUB', 'https://testnet.hub.membase.io/')      
 hub_client = Client(he)
