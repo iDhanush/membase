@@ -17,7 +17,8 @@ pip install -e .
 ### multi-memory
 
 - support conversation switch
-- support conversation preload from storage hub
+- support conversation upload if auto_upload_to_hub is set, conversation content can be visit at: https://testnet.hub.membase.io/
+- support conversation preload from storage hub: https://testnet.hub.membase.io/
 
 ```python
 from membase.memory.multi_memory import MultiMemory
@@ -57,8 +58,6 @@ msg = Message(
 )
 memory.add(msg)
 ```
-
-
 
 ### knowledge
 
