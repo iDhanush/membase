@@ -1,5 +1,7 @@
 import pkgutil
 import json
+import threading
+import time
 
 from web3 import Web3
 from eth_account.messages import encode_defunct
@@ -22,11 +24,13 @@ class Client:
     # RPC endpoints for different chains
     BSC_TESTNET_RPC = [
         "https://data-seed-prebsc-1-s1.binance.org:8545",
-        "https://data-seed-prebsc-1-s2.binance.org:8545"
+        "https://data-seed-prebsc-1-s2.binance.org:8545",
         "https://data-seed-prebsc-1-s3.binance.org:8545",
         "https://data-seed-prebsc-2-s1.binance.org:8545",
+        "https://data-seed-prebsc-2-s2.binance.org:8545",
+        "https://data-seed-prebsc-2-s3.binance.org:8545",
         "https://bsc-testnet.drpc.org",
-        "https://bsc-testnet.public.blastapi.io"
+        "https://bsc-testnet.public.blastapi.io",
         "https://bsc-testnet-rpc.publicnode.com",
         "https://api.zan.top/bsc-testnet"
     ]
@@ -72,7 +76,44 @@ class Client:
 
         contract_json = json.loads(pkgutil.get_data('membase.chain', 'solc/Membase.json').decode())
         self.membase = self.w3.eth.contract(address=membase_contract, abi=contract_json['abi'])
-    
+
+        # Start periodic connection check
+        self.check_interval = 300
+        self._stop_check = False
+        self._check_thread = threading.Thread(target=self._periodic_connection_check, daemon=True)
+        self._check_thread.start()
+
+    def _periodic_connection_check(self):
+        """
+        Periodically check RPC connection and switch if needed.
+        Runs in a separate thread.
+        """
+        while not self._stop_check:
+            try:
+                if not self.w3.is_connected():
+                    logger.warning(f"RPC connection lost: {self.current_rpc}")
+                    self._check_and_switch_rpc()
+            except Exception as e:
+                logger.warning(f"Error checking RPC connection: {str(e)}")
+                self._check_and_switch_rpc()
+            
+            time.sleep(self.check_interval)
+
+    def stop_periodic_check(self):
+        """
+        Stop the periodic connection check thread.
+        Should be called when the client is no longer needed.
+        """
+        self._stop_check = True
+        if self._check_thread.is_alive():
+            self._check_thread.join(timeout=1.0)
+
+    def __del__(self):
+        """
+        Cleanup when the object is destroyed.
+        """
+        self.stop_periodic_check()
+
     def _check_and_switch_rpc(self):
         """
         Check current RPC connection and switch to another one if needed.
@@ -82,7 +123,7 @@ class Client:
         if hasattr(self, 'w3'):
             try:
                 if self.w3.is_connected():
-                    return self.w3
+                    return
             except Exception:
                 pass
 
