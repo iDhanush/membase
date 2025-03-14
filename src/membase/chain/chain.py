@@ -19,33 +19,99 @@ import logging
 logger = logging.getLogger(__name__)
 
 class Client:
+    # RPC endpoints for different chains
+    BSC_TESTNET_RPC = [
+        "https://data-seed-prebsc-1-s1.binance.org:8545",
+        "https://data-seed-prebsc-1-s2.binance.org:8545"
+        "https://data-seed-prebsc-1-s3.binance.org:8545",
+        "https://data-seed-prebsc-2-s1.binance.org:8545",
+        "https://bsc-testnet.drpc.org",
+        "https://bsc-testnet.public.blastapi.io"
+        "https://bsc-testnet-rpc.publicnode.com",
+        "https://api.zan.top/bsc-testnet"
+    ]
+
+    BSC_MAINNET_RPC = [
+        "https://bsc-dataseed1.binance.org",
+        "https://bsc-dataseed2.binance.org",
+        "https://bsc-dataseed3.binance.org",
+        "https://bsc-dataseed4.binance.org"
+    ]
+    
+    ETH_MAINNET_RPC = [
+    ]
+
     def __init__(self,  
                  wallet_address: str, 
                  private_key: str, 
                  ep: str = "https://bsc-testnet-rpc.publicnode.com", 
                  membase_contract: str = "0x100E3F8c5285df46A8B9edF6b38B8f90F1C32B7b"
                  ):
-        w3 = Web3(Web3.HTTPProvider(ep))
-        if w3.is_connected():
-            print(f"Connected to the chain: {ep}")
+        
+        # Determine which RPC list to use based on the endpoint
+        if "binance" in ep.lower() or "bsc" in ep.lower():
+            if "testnet" in ep.lower() or "test" in ep.lower():
+                self.rpc_list = self.BSC_TESTNET_RPC
+            else:
+                self.rpc_list = self.BSC_MAINNET_RPC
         else:
-            print(f"Failed to connect to the chain: {ep}")
-            exit(1)
+            self.rpc_list = self.ETH_MAINNET_RPC
+            
+        # Add user-provided endpoint to the beginning of the list
+        if ep not in self.rpc_list:
+            self.rpc_list.insert(0, ep)
 
-        self.w3 = w3
+        # Initialize connection
+        self.current_rpc = ep
+        self._check_and_switch_rpc()
+        if not self.w3:
+            raise Exception("Failed to connect to any RPC endpoint")
+
         self.wallet_address = Web3.to_checksum_address(wallet_address)
         self.private_key = private_key
 
         contract_json = json.loads(pkgutil.get_data('membase.chain', 'solc/Membase.json').decode())
         self.membase = self.w3.eth.contract(address=membase_contract, abi=contract_json['abi'])
     
+    def _check_and_switch_rpc(self):
+        """
+        Check current RPC connection and switch to another one if needed.
+        Returns Web3 instance if connection is successful, None otherwise.
+        """
+        # First check current connection if exists
+        if hasattr(self, 'w3'):
+            try:
+                if self.w3.is_connected():
+                    return self.w3
+            except Exception:
+                pass
+
+        # Try connecting to each RPC node until a successful connection is made
+        for rpc in self.rpc_list:
+            # Skip current failing RPC
+            if rpc == self.current_rpc:
+                continue
+                
+            try:
+                w3 = Web3(Web3.HTTPProvider(rpc))
+                if w3.is_connected():
+                    print(f"Successfully connected to the chain: {rpc}")
+                    self.current_rpc = rpc
+                    self.w3 = w3
+                    break
+            except Exception as e:
+                logger.warning(f"Failed to connect to {rpc}: {str(e)}")
+                continue
+
     def sign_message(self, message: str)-> str: 
         digest = encode_defunct(text=message)
+        self._check_and_switch_rpc()
         signed_message =  self.w3.eth.account.sign_message(digest,self.private_key)
         return signed_message.signature.hex()
     
     def valid_signature(self, message: str, signature: str, wallet_address: str) -> bool: 
         digest = encode_defunct(text=message)
+        self._check_and_switch_rpc()
         rec = self.w3.eth.account.recover_message(digest, signature=signature)
         if wallet_address == rec:
             return True
@@ -156,6 +222,11 @@ class Client:
         self, function: ContractFunction, tx_params: TxParams
     ) :
         """Build and send a transaction."""
+        # Check connection before sending transaction
+        self._check_and_switch_rpc()
+        if not self.w3.is_connected():
+            raise Exception("No available RPC connection")
+
         transaction = function.build_transaction(tx_params)
 
         try: 
