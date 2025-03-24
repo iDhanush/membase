@@ -2,11 +2,11 @@ from setuptools import setup, find_packages
 
 setup(
     name="membase",
-    version="0.1.6",
+    version="0.1.7",
     packages=find_packages(where="src"),
     package_dir={"": "src"},
     package_data={
-        "membase": ["chain/solc/*.json"],
+        "membase": ["chain/solc/**/*"],
     },
 
     description="python sdk for membase operation: memory, knowledge, chain, auth etc.",
