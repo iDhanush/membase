@@ -44,3 +44,5 @@ log/
 Thumbs.db
 
 chroma_db/
+
+out/
