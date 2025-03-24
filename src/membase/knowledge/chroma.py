@@ -3,6 +3,7 @@
 ChromaDB-based implementation of KnowledgeBase
 """
 
+import hashlib
 import os
 import uuid
 import json
@@ -69,12 +70,14 @@ class ChromaKnowledgeBase(KnowledgeBase):
     def add_documents(
         self,
         documents: Union[Document, List[Document]],
+        strict: bool = False,
     ) -> None:
         """
         Add documents to the knowledge base.
         
         Args:
             documents: Single document or list of documents to add
+            strict: Whether to strictly check for duplicate documents
         """
         if isinstance(documents, Document):
             documents = [documents]
@@ -87,8 +90,19 @@ class ChromaKnowledgeBase(KnowledgeBase):
         for doc in documents:
             # Generate unique ID if not provided
             if doc.doc_id is None:
-                doc.doc_id = str(uuid.uuid4())
+                doc.doc_id = hashlib.sha256(doc.content.encode()).hexdigest()
             
+            existing_doc = self.collection.get(ids=[doc.doc_id])
+            if len(existing_doc["ids"]) > 0:
+                print(f"Document {doc.doc_id} already exists in the collection")
+                continue
+
+            if strict:
+                is_duplicate = self.evaluate_document(doc.content)
+                if is_duplicate:
+                    print(f"Document {doc.doc_id} is a duplicate content")
+                    continue
+
             # Ensure metadata is a non-empty dict
             if not doc.metadata:
                 doc.metadata = {"source": "default"}
@@ -100,12 +114,13 @@ class ChromaKnowledgeBase(KnowledgeBase):
             texts.append(doc.content)
             metadatas.append(doc.metadata)
         
-        # Add to ChromaDB
-        self.collection.add(
-            ids=ids,
-            documents=texts,
-            metadatas=metadatas
-        )
+        if len(ids) > 0:
+            # Add to ChromaDB
+            self.collection.add(
+                ids=ids,
+                documents=texts,
+                metadatas=metadatas
+            )
     
         # Upload to hub if requested
         if self._auto_upload_to_hub:
@@ -114,7 +129,7 @@ class ChromaKnowledgeBase(KnowledgeBase):
                 # doc serialized as json string in upload_hub
                 hub_client.upload_hub(
                     owner=self._membase_account,
-                    filename=doc.doc_id,
+                    filename="rag_" + self._collection_name + "_" + doc.doc_id,
                     msg=json.dumps(doc.to_dict())
                 )
 
@@ -245,6 +260,7 @@ class ChromaKnowledgeBase(KnowledgeBase):
         query_params = {
             "query_texts": [query],
             "n_results": top_k,
+            "include": ["documents", "metadatas", "distances"],
             **kwargs
         }
         
@@ -285,6 +301,7 @@ class ChromaKnowledgeBase(KnowledgeBase):
                 metadata=results["metadatas"][0][i],
                 doc_id=results["ids"][0][i]
             )
+            doc.metadata["score"] = results["distances"][0][i]
             documents.append(doc)
             
         return documents
@@ -393,3 +410,28 @@ class ChromaKnowledgeBase(KnowledgeBase):
                 "high_recall": min_threshold
             }
         }
+
+    def evaluate_document(
+        self,
+        content: str,
+        top_k: int = 1
+    ) -> Dict[str, Any]:
+        """
+        Evaluate a document based on its similarity to the query.
+        
+        Args:
+            doc: The document to evaluate
+            top_k: Number of documents to retrieve
+
+        """
+        docs = self.retrieve(content, top_k=top_k)
+
+        # check if the document is duplicate
+        for doc in docs:
+            if doc.metadata["score"] < 0.2:
+                return True
+        return False
+
+    def close(self) -> None:
+        """Close the ChromaDB client."""
+        self.client.close()

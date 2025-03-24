@@ -42,6 +42,10 @@ def sample_documents() -> List[Document]:
         Document(
             content="The lazy fox sleeps under the tree.",
             metadata={"source": "test3", "date": "2024-01-03"}
+        ),
+        Document(
+            content="The quick brown fox jump over the lazy dog.",
+            metadata={"source": "test4", "date": "2024-01-03"}
         )
     ]
 
@@ -78,8 +82,22 @@ def test_add_documents(kb, sample_documents):
     # Test adding multiple documents
     kb.add_documents(sample_documents[1:])
     stats = kb.get_stats()
-    assert stats["num_documents"] == 3
+    assert stats["num_documents"] == 4
 
+
+def test_add_documents_strict(kb, sample_documents):
+    """Test adding documents to the knowledge base."""
+    # Test adding a single document
+    kb.add_documents(sample_documents[0], strict=True)
+    stats = kb.get_stats()
+    print(stats)
+    assert stats["num_documents"] == 1
+    
+    # Test adding multiple documents
+    kb.add_documents(sample_documents[1:], strict=True)
+    stats = kb.get_stats()
+    # one is duplicate
+    assert stats["num_documents"] == 3
 
 def test_update_documents(kb, sample_documents):
     """Test updating documents in the knowledge base."""
@@ -182,7 +200,7 @@ def test_get_stats(kb, sample_documents):
     
     # Get and verify stats
     stats = kb.get_stats()
-    assert stats["num_documents"] == 3
+    assert stats["num_documents"] == 4
     assert stats["collection_name"] == "default"
     assert "embedding_function" in stats
     assert stats["persist_directory"] == kb._persist_directory
@@ -199,7 +217,7 @@ def test_persistence(test_dir, sample_documents):
     
     # Verify documents are persisted
     stats = kb2.get_stats()
-    assert stats["num_documents"] == 3
+    assert stats["num_documents"] == 4
     
     # Test retrieval in second instance
     results = kb2.retrieve("quick brown", top_k=2)
@@ -255,7 +273,7 @@ def test_retrieve_with_similarity_threshold(kb, sample_documents):
     
     # Test retrieval with high similarity threshold
     results = kb.retrieve("quick brown", similarity_threshold=0.8)
-    assert len(results) <= 2  # Should only return very similar documents
+    assert len(results) <= 3  # Should only return very similar documents
     
     # Test retrieval with low similarity threshold
     results = kb.retrieve("quick brown", similarity_threshold=0.1)
@@ -263,7 +281,7 @@ def test_retrieve_with_similarity_threshold(kb, sample_documents):
     
     # Test retrieval with zero threshold (default behavior)
     results = kb.retrieve("quick brown", similarity_threshold=0.0)
-    assert len(results) == 3  # Should return all matching documents 
+    assert len(results) == 4  # Should return all matching documents 
 
 
 def test_find_optimal_threshold(kb, sample_documents):
@@ -314,7 +332,7 @@ def test_retrieve_with_filters(kb, sample_documents):
         query="fox",
         content_filter="lazy"
     )
-    assert len(results) == 2
+    assert len(results) == 3
     assert all("lazy" in doc.content.lower() for doc in results)
     
     # Test combined filters
