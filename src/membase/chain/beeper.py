@@ -1,3 +1,4 @@
+import math
 import os
 import json
 import pkgutil
@@ -58,6 +59,17 @@ class BeeperClient(BaseClient):
         self.router_address = Web3.to_checksum_address(self.config["PancakeV3SwapRouter"])
         router_abi = pkgutil.get_data('membase.chain', 'solc/pancake_swaprouter_v3.abi').decode()
         self.router = self.w3.eth.contract(address=self.router_address, abi=router_abi)
+
+        self.quoter_address = Web3.to_checksum_address(self.config["PancakeV3Quoter"])
+        quoter_abi = pkgutil.get_data('membase.chain', 'solc/pancake_quoter_v3.abi').decode()
+        self.quoter = self.w3.eth.contract(address=self.quoter_address, abi=quoter_abi)
+
+
+        #pancake fee: 100:0.01%; 500:0.05%; 2500:0.25%; 10000:1%
+        self.fees = [10000, 2500, 500, 100]
+        factory_address =  Web3.to_checksum_address(self.config["PancakeV3Factory"])
+        factory_abi = pkgutil.get_data('membase.chain', 'solc/pancake_factory_v3.abi').decode()
+        self.factory = self.w3.eth.contract(address=factory_address, abi=factory_abi)
 
         self.privy_app_id = ""
         if privy_app_id and privy_app_id != "": 
@@ -220,7 +232,7 @@ class BeeperClient(BaseClient):
                     token_symbol:  str = 'Power by Beeper',
                     token_supply: int = 10000000000 * 10**18,
                     initial_tick: int = -207400, 
-                    fee: int = 10000, #1%; 500:0.05%; 2500:0.25%
+                    fee: int = 10000, 
                     buyfee: int = 10000,                                               
                     ) -> str:
         
@@ -292,6 +304,9 @@ class BeeperClient(BaseClient):
             :param input_token: "" means native.
             :param output_token: "" means native.
             """
+            amount = int(amount)
+            fee = int(fee)
+            
             if input_token == "" :
                 # buy token
                 return self._native_to_token(output_token, amount, fee
@@ -310,14 +325,12 @@ class BeeperClient(BaseClient):
                   ):
         token_address = Web3.to_checksum_address(token_address)
 
-        pfees = [10000, 2500, 500, 100]
-        for pfee in pfees:
-            paddr = self.get_token_pool(token_address, pfee)
-            if paddr != ADDRESS_ZERO:
-                print(f"pool addr at: {paddr} {pfee}")
-                fee = pfee
-                break
-        
+        paddr = self.get_token_pool_at_fee(self.router.functions.WETH9().call(), token_address, fee)
+        if not paddr or paddr == ADDRESS_ZERO:
+            paddr, fee = self.get_token_pool(token_address)
+            if not paddr or paddr == ADDRESS_ZERO:
+                raise Exception(f"No pair for input token or not paired with wbnb")
+
         return self.build_and_send_tx(
             self.router.functions.exactInputSingle(
                 {
@@ -341,13 +354,11 @@ class BeeperClient(BaseClient):
                   ):
         token_address = Web3.to_checksum_address(token_address)
 
-        pfees = [10000, 2500, 500, 100]
-        for pfee in pfees:
-            paddr = self.get_token_pool(token_address, pfee)
-            if paddr != ADDRESS_ZERO:
-                print(f"pool addr at: {paddr} {pfee}")
-                fee = pfee
-                break
+        paddr = self.get_token_pool_at_fee(token_address, self.router.functions.WETH9().call(), fee)
+        if not paddr or paddr == ADDRESS_ZERO:
+            paddr, fee = self.get_token_pool(token_address)
+            if not paddr or paddr == ADDRESS_ZERO:
+                raise Exception(f"No pair for input token or not paired with wbnb")
 
         self.check_appraval(token_address, self.router_address)
 
@@ -387,7 +398,6 @@ class BeeperClient(BaseClient):
         input_token = Web3.to_checksum_address(input_token)
         output_token = Web3.to_checksum_address(output_token)
 
-
         wbnb_address = Web3.to_checksum_address(self.router.functions.WETH9().call())
         if input_token != wbnb_address and output_token != wbnb_address:
             return self._token_to_token_via_hop(input_token, output_token, amount, fee)
@@ -424,27 +434,17 @@ class BeeperClient(BaseClient):
         wbnb_address = self.router.functions.WETH9().call()
 
         tokens = [input_token, wbnb_address, output_token]
-        #fees = [fee, fee]
-        fees = []
-        # pancake fee: 100, 500, 2500, 10000        
-        pfees = [10000, 2500, 500, 100]
-        for fee in pfees:
-            paddr = self.get_token_pool(input_token, fee)
-            if paddr != ADDRESS_ZERO:
-                print(f"pool addr at: {paddr} {fee}")
-                fees.append(fee)
-                break
-        if len(fees) != 1:
-            raise Exception(f"No pair for input token or not paired with wbnb")
+        fees = []    
 
-        for fee in pfees:
-            paddr = self.get_token_pool(output_token, fee)
-            if paddr != ADDRESS_ZERO:
-                print(f"pool addr at: {paddr} {fee}")
-                fees.append(fee)
-                break
-        if len(fees) != 2:
-            raise Exception(f"No pair for output token or not paired with wbnb")            
+        paddr, pfee = self.get_token_pool(input_token)
+        if not paddr or paddr == ADDRESS_ZERO:
+            raise Exception(f"No pair for input token or not paired with wbnb")
+        fees.append(pfee)
+
+        paddr, pfee = self.get_token_pool(output_token)
+        if not paddr or paddr == ADDRESS_ZERO:
+            raise Exception(f"No pair for output token or not paired with wbnb")
+        fees.append(pfee)        
 
         path = self._encode_path(tokens, fees)
 
@@ -462,18 +462,14 @@ class BeeperClient(BaseClient):
         )
 
 
-    def get_token_pool(self, 
-                token_address :str,
-                fee: int = 10000,
+    def get_token_pool_at_fee(self, 
+                token_in :str,
+                token_out :str,
+                fee: int,
                 ) -> str:
-        token_address = Web3.to_checksum_address(token_address)
-        wbnb_address = self.router.functions.WETH9().call()
-
-        factory_address =  Web3.to_checksum_address(self.config["PancakeV3Factory"])
-        factory_abi = pkgutil.get_data('membase.chain', 'solc/pancake_factory_v3.abi').decode()
-        factory = self.w3.eth.contract(address=factory_address, abi=factory_abi)
-        
-        return factory.functions.getPool(token_address, wbnb_address, fee).call()
+        token_in = Web3.to_checksum_address(token_in)
+        token_out = Web3.to_checksum_address(token_out)
+        return self.factory.functions.getPool(token_in, token_out, fee).call()
 
     def _encode_path(
         self,
@@ -511,3 +507,153 @@ class BeeperClient(BaseClient):
 
     def create_wallet(self):
         return _create_wallet(self.privy_app_id)
+    
+    def get_token_pool(self, token_address: str):
+        token_out = self.router.functions.WETH9().call()
+        for fee in self.fees:
+            paddr = self.get_token_pool_at_fee(token_address, token_out, fee)
+            if paddr != ADDRESS_ZERO:
+                print(f"pool addr at: {paddr} {fee}")
+                return paddr, fee
+        return None, None
+
+    def get_raw_price(
+        self, token_in: str, token_out: str, fee: Optional[int] = None
+    ) -> float:
+        if token_in == "":
+            token_in = self.router.functions.WETH9().call()
+        if token_out == "":
+            token_out = self.router.functions.WETH9().call()
+
+        token_in = Web3.to_checksum_address(token_in)
+        token_out = Web3.to_checksum_address(token_out)
+
+        if fee:
+            paddr = self.get_token_pool_at_fee(token_in, token_out, fee)
+            if not paddr or paddr == ADDRESS_ZERO:
+                fee = None
+
+        if not fee:
+            for f in self.fees:
+                paddr = self.get_token_pool_at_fee(token_in, token_out, f)
+                if paddr != ADDRESS_ZERO:
+                    fee = f
+                    break
+        if fee is None:
+            raise Exception(f"No pair for input token and output token")
+            
+        pool_abi = pkgutil.get_data('membase.chain', 'solc/pancake_pool_v3.abi').decode()
+        pool_contract = self.w3.eth.contract(address=paddr, abi=pool_abi)
+
+        t1 = pool_contract.functions.token1().call()
+        if t1.lower() == token_in.lower():
+            den0 = self.get_token_decimals(token_in)
+            den1 = self.get_token_decimals(token_out)
+        else:
+            den0 = self.get_token_decimals(token_out)
+            den1 = self.get_token_decimals(token_in)
+        slot = pool_contract.functions.slot0().call()
+        raw_price = (slot[0] * slot[0] * 10**den1 >> (96 * 2)) / (
+            10**den0
+        )
+        if t1.lower() == token_in.lower():
+            raw_price = 1 / raw_price
+        return raw_price
+    
+    def get_price_input(
+        self,
+        token0: str,  # input token
+        token1: str,  # output token
+        qty: int,
+        fee: Optional[int] = None,
+    ) -> int:
+        """Given `qty` amount of the input `token0`, returns the maximum output amount of output `token1`."""
+
+        if token0 == "":
+            token0 = self.router.functions.WETH9().call()
+        if token1 == "":
+            token1 = self.router.functions.WETH9().call()
+                
+        return self._get_token_to_token_input_price(token0, token1, qty, fee)
+    
+    def _get_token_to_token_input_price(
+        self,
+        token0: str,  # input token
+        token1: str,  # output token
+        qty: int,
+        fee: Optional[int] = None,
+    ) -> int:
+        tokens = []
+        fees = []
+        if token0 == self.router.functions.WETH9().call() or token1 == self.router.functions.WETH9().call():
+            tokens = [token0, token1]
+            if fee:
+                paddr = self.get_token_pool_at_fee(token0, token1, fee)
+                if not paddr or paddr == ADDRESS_ZERO:
+                    fee = None
+            if fee is None:
+                for f in self.fees:
+                    paddr = self.get_token_pool_at_fee(token0, token1, f)
+                    if paddr != ADDRESS_ZERO:
+                        fee = f
+                        break
+            
+            if fee is None:
+                raise Exception(f"No pair for input token or not paired with wbnb")
+
+            fees = [fee]
+        else:
+            mid_token = self.router.functions.WETH9().call()
+            tokens = [token0, mid_token, token1]
+            for f in self.fees:
+                paddr = self.get_token_pool_at_fee(token0, mid_token, f)
+                if paddr != ADDRESS_ZERO:
+                    fees.append(f)
+                    break
+            for f in self.fees:
+                paddr = self.get_token_pool_at_fee(mid_token, token1, f)
+                if paddr != ADDRESS_ZERO:
+                    fees.append(f)
+                    break
+            if len(fees) != 2:
+                raise Exception(f"No pair for input token or not paired with wbnb")
+        path = self._encode_path(tokens, fees)
+        res = self.quoter.functions.quoteExactInput(path, qty).call()
+        return res[0]
+
+    def estimate_price_impact(
+        self,
+        token0: str,  # input token
+        token1: str,  # output token
+        qty: int,
+        fee: Optional[int] = None,
+    ) -> int:
+        """Given `qty` amount of the input `token0`, returns the maximum output amount of output `token1`."""
+
+        if token0 == "":
+            token0 = self.router.functions.WETH9().call()
+        if token1 == "":
+            token1 = self.router.functions.WETH9().call()
+
+        raw_price = self.get_raw_price(token0, token1, fee)
+        cost_amount = self.get_price_input(token0, token1, qty, fee)
+
+        price_amount = (
+            cost_amount / (qty / (10 ** self.get_token_decimals(token0)))
+        ) / 10 ** self.get_token_decimals(token1)
+
+        # calculate and subtract the realised fees from the price impact. See:
+        # https://github.com/uniswap-python/uniswap-python/issues/310
+        # The fee calculation will need to be updated when adding support for the AutoRouter.
+        price_impact_with_fees = float((raw_price - price_amount) / raw_price)
+        if not fee:
+            fee = 10000
+        fee_percentage = fee / 1000000
+        fee_realised = math.ceil(qty * fee_percentage)
+        fee_realised_percentage = fee_realised / qty
+        price_impact_real = price_impact_with_fees - fee_realised_percentage
+
+        return price_impact_real
+
+    def get_wrapped_token(self):
+        return self.router.functions.WETH9().call()

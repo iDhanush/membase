@@ -13,6 +13,7 @@ BNB_CHAIN_SETTINGS = {
     "PancakeV3Factory": "0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865",
     "PancakeV3SwapRouter": "0x1b81D678ffb9C0263b24A97847620C99d213eB14",
     "PancakeV3PoolDeployer": "0x41ff9AA7e16B8B1a8a8dc4f0eFacd93D02d071c9",
+    "PancakeV3Quoter": "0xbC203d7f83677c7ed3F7acEc959963E7F4ECC5C2",
     "PostionManage" : "0x427bF5b37357632377eCbEC9de3626C71A5396c1",
     "Beeper" : "0x1CbcD3d13C9d73a2bD40D6737294ccd21D1607c1",
     "BeeperUtil" : "0x04ad17C42D38fe20d754D8b32C2aA01d02c7b32F",
@@ -63,12 +64,16 @@ def test_swap_token():
     #tx, to, supply = dbp.deploy_token(twitter_account, twitter_id)
     #print(f"deployed token: {to}")   
 
-    paddr = bp.get_token_pool(to, 10000)
+    paddr, pfee = bp.get_token_pool(to)
     print(f"pool addr: {paddr}")
 
     # token->token
-    bp.make_trade("", to, 2306184959924)
+    tx = bp.make_trade("", to, 2306184959924)
+    print(f"tx: {tx}")
+    tx_info = bp.get_tx_info(tx)
+    print(f"tx_info: {tx_info}")
 
+    exit()
    
     # token-> bnb 
     amount = bp.get_balance(wallet, to)
@@ -106,8 +111,52 @@ def test_transfer():
     val = bp.get_balance(wallet, to) 
     print(f"{val}")
 
+def test_get_price():
+    to = Web3.to_checksum_address("0x8d008B313C1d6C7fE2982F62d32Da7507cF43551")
+    print(f"==== get price")
+    paddr, fee = bp.get_token_pool(to)
+    print(f"{paddr} {fee}")
+
+    token0_amount = bp.get_balance(paddr, to)
+    token0_amount = token0_amount / 10**18
+    print(f"token0: {token0_amount}")
+
+    token1_amount = bp.get_balance(paddr, wbnb)
+    token1_amount = token1_amount / 10**18
+    print(f"token1: {token1_amount}")
+
+    fee = fee / 1_000_000
+    print(f"fee: {fee}")
+
+    slippage = 0.01
+
+    token0_trade_amount = token0_amount * slippage /((1-slippage)*(1-fee))
+    print(f"token0_trade_amount: {token0_trade_amount}")
+
+    token1_trade_amount = token1_amount * slippage /((1-slippage)*(1-fee))
+    print(f"token1_trade_amount: {token1_trade_amount}")
+    
+
+    amount = 1_000_000_000_000_000_000
+    raw_price = bp.get_raw_price(to, wbnb)
+    print(f"raw_price: {raw_price}")
+
+    
+    real_price = bp.get_price_input(to, wbnb, amount)
+    print(f"real_price: {real_price/amount}")
+
+    raw_price = bp.get_raw_price(wbnb, to)
+    print(f"raw_price: {raw_price}")
+
+    
+    real_price = bp.get_price_input(wbnb, to, amount)
+    print(f"real_price: {real_price/amount}")
+
+    impact = bp.estimate_price_impact(wbnb, to, amount)
+    print(f"impact: {impact}")
+
 try:
-    #test_swap_token()
-    test_transfer()
+    test_swap_token()
+    #test_get_price()
 except Exception as e:
     print(e)

@@ -194,7 +194,7 @@ class BaseClient:
                 print("Transaction failed")
                 self._display_cause(tx_hash)
             else:
-                print(f'Transaction succeeded:: {tx_hash.hex()}')
+                print(f'Transaction succeeded: {tx_hash.hex()}')
                 logger.debug(f"nonce: {tx_params['nonce']}")
                 #gasfee = tx_receipt['gasUsed']*tx_params['gasPrice']
                 return "0x"+str(tx_hash.hex())
@@ -343,3 +343,17 @@ class BaseClient:
             return True
         else:
             return False
+    
+    def get_token_decimals(self, token_address: str) -> int:
+        if token_address == "" or token_address == ADDRESS_ZERO:
+            return 18
+        token_contract = _load_contract_erc20(self.w3, token_address=token_address)
+        return token_contract.functions.decimals().call()
+
+    def get_token_supply(self, token_address: str) -> int:
+        token_contract = _load_contract_erc20(self.w3, token_address=token_address)
+        return token_contract.functions.totalSupply().call()
+
+    def get_tx_info(self, tx_hash: str):
+        tx_receipt = self.w3.eth.get_transaction_receipt(tx_hash)
+        return tx_receipt

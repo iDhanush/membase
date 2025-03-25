@@ -280,7 +280,7 @@ class Client:
                 print("Transaction failed")
                 self._display_cause(tx_hash)
             else:
-                print(f'Transaction succeeded:: {tx_hash.hex()}')
+                print(f'Transaction succeeded: {tx_hash.hex()}')
                 logger.debug(f"nonce: {tx_params['nonce']}")
                 #gasfee = tx_receipt['gasUsed']*tx_params['gasPrice']
                 return "0x"+str(tx_hash.hex())
