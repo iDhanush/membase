@@ -35,6 +35,7 @@ class TraderClient(BeeperClient):
             default_conversation_id=self.local_id,
             auto_upload_to_hub=True,
         )
+        self.memory.load_from_hub(self.local_id)
 
         self.trade_prefix = f"tx_{self.local_id}"
         self.liquidity_prefix = f"liquidity_{self.local_id}"
@@ -47,7 +48,6 @@ class TraderClient(BeeperClient):
         self.trade_memory = self.memory.get_memory(self.trade_prefix)
         self.liquidity_memory = self.memory.get_memory(self.liquidity_prefix)
         self.wallet_memory = self.memory.get_memory(self.wallet_prefix)
-
 
         self.wallet_history = []
 

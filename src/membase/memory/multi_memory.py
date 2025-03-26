@@ -172,6 +172,8 @@ class MultiMemory:
         # check if the conversation has been preloaded
         if self.is_preloaded(conversation_id):
             return
+        # Record the preloaded conversation
+        self._preload_conversations[conversation_id] = True
         
         memory = self.get_memory(conversation_id)
         msgstrings = hub_client.get_conversation(self._membase_account, conversation_id)
@@ -190,8 +192,7 @@ class MultiMemory:
             except Exception as e:
                 logging.error(f"Error loading message: {e}")
         
-        # Record the preloaded conversation
-        self._preload_conversations[conversation_id] = True
+        
         
     def load_all_from_hub(self) -> None:
         """
