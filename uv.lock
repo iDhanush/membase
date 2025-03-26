@@ -1160,7 +1160,7 @@ wheels = [
 
 [[package]]
 name = "membase"
-version = "0.1.7"
+version = "0.1.8"
 source = { virtual = "." }
 dependencies = [
     { name = "chromadb" },
