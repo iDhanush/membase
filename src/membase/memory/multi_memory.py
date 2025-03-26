@@ -36,6 +36,7 @@ class MultiMemory:
         self._membase_account = membase_account
         self._auto_upload_to_hub = auto_upload_to_hub
         self._default_conversation_id = default_conversation_id or str(uuid.uuid4())
+        self._preload_conversations = {}
         if preload_from_hub:
             self.load_all_from_hub()
             
@@ -168,6 +169,10 @@ class MultiMemory:
         Args:
             conversation_id (str): The conversation ID to load.
         """
+        # check if the conversation has been preloaded
+        if self.is_preloaded(conversation_id):
+            return
+        
         memory = self.get_memory(conversation_id)
         msgstrings = hub_client.get_conversation(self._membase_account, conversation_id)
         if msgstrings is None:
@@ -185,6 +190,9 @@ class MultiMemory:
             except Exception as e:
                 logging.error(f"Error loading message: {e}")
         
+        # Record the preloaded conversation
+        self._preload_conversations[conversation_id] = True
+        
     def load_all_from_hub(self) -> None:
         """
         Load all memories from hub for all conversations under the current account.
@@ -199,3 +207,15 @@ class MultiMemory:
                 self.load_from_hub(conv_id)
         else:
             logging.warning("no conversations found")
+            
+    def is_preloaded(self, conversation_id: str) -> bool:
+        """
+        Check if a conversation has been preloaded from hub.
+
+        Args:
+            conversation_id (str): The conversation ID to check.
+
+        Returns:
+            bool: True if the conversation has been preloaded, False otherwise.
+        """
+        return conversation_id in self._preload_conversations

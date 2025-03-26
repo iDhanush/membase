@@ -38,12 +38,15 @@ class TraderClient(BeeperClient):
 
         self.trade_prefix = f"tx_{self.local_id}"
         self.liquidity_prefix = f"liquidity_{self.local_id}"
+        self.wallet_prefix = f"wallet_{self.local_id}"
 
         self.memory.load_from_hub(self.trade_prefix)
         self.memory.load_from_hub(self.liquidity_prefix)
-        
+        self.memory.load_from_hub(self.wallet_prefix)
+
         self.trade_memory = self.memory.get_memory(self.trade_prefix)
         self.liquidity_memory = self.memory.get_memory(self.liquidity_prefix)
+        self.wallet_memory = self.memory.get_memory(self.wallet_prefix)
 
 
         self.wallet_history = []
@@ -117,13 +120,20 @@ class TraderClient(BeeperClient):
             "token_balance": token_balance,
             "total_value": total_value,
         }
-        #check duplicate with previous one
-        if len(self.wallet_history) > 0:
-            if self.wallet_history[-1]['native_balance'] == balance and self.wallet_history[-1]['token_balance'] == token_balance and self.wallet_history[-1]['total_value'] == total_value:
+
+        res = self.wallet_memory.get(recent_n=1)
+        if len(res) > 0:
+            info = json.loads(res[0].content)
+            if info['native_balance'] == balance and info['token_balance'] == token_balance and info['total_value'] == total_value:
                 #print(f"duplicate wallet info: {wallet_info}")
                 return
 
-        self.wallet_history.append(wallet_info)
+        msg = Message(
+            name=self.membase_id,
+            role="user",
+            content=json.dumps(wallet_info),
+        )
+        self.wallet_memory.add(msg)
 
     def get_info(self, recent_n: int = 8):
         # token info
@@ -131,17 +141,37 @@ class TraderClient(BeeperClient):
             "desc": "Token information including its contract address, decimals, total supply, and fee for trading",
             "infos": self.token_info,
         }
-        # user owned info
-        wallet_infos = {
-            "desc": "User wallet information including native balance, token balance, and total portfolio value (token_balance * token_price + native_balance). User can buy and sell tokens using balances in the wallet.",
-            "infos": self.wallet_history[-recent_n:],
-        }
-        # liquidity pool info
-        liquidity_infos = self.liquidity_memory.get(recent_n=recent_n)
+
         infos = []
-        for info in liquidity_infos:
+        recent_wallet_infos = self.wallet_memory.get(recent_n=recent_n)
+        for info in recent_wallet_infos:
             content = json.loads(info.content)
             infos.append(content)
+        wallet_infos = {
+            "desc": "User wallet information including native balance, token balance, and total portfolio value (token_balance * token_price + native_balance). User can buy and sell tokens using balances in the wallet.",
+            "infos": infos,
+        }
+
+        # liquidity pool info
+        # First get the most recent 64 records
+        infos = []
+        recent_liquidity_infos = self.liquidity_memory.get(recent_n=64)
+        if recent_liquidity_infos:
+            total_count = len(recent_liquidity_infos)
+            if total_count <= recent_n:
+                # If total count is less than or equal to required number, use all records
+                infos = [json.loads(info.content) for info in recent_liquidity_infos]
+            else:
+                # Calculate step size for even distribution
+                step = (total_count - 1) // (recent_n - 1)
+                # Always include the most recent record
+                infos.append(json.loads(recent_liquidity_infos[0].content))
+                # Evenly select other records
+                for i in range(1, recent_n - 1):
+                    idx = i * step
+                    infos.append(json.loads(recent_liquidity_infos[idx].content))
+                # Always include the oldest record from recent 64
+                infos.append(json.loads(recent_liquidity_infos[-1].content))
 
         liquidity_infos = {
             "pool desc": "A liquidity pool is a pairing of tokens in a smart contract that is used for swapping on decentralized exchanges (DEXs).",

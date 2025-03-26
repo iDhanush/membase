@@ -315,9 +315,9 @@ class BaseClient:
     def check_appraval(self, token_address: str, to_address: str):
         token_address = Web3.to_checksum_address(token_address)
         is_approved = self._is_approved(token_address, to_address)
+        logger.info(f"Approved {token_address}: {is_approved}")
         if not is_approved:
             self.approve(token_address, to_address)
-        logger.warning(f"Approved {token_address}: {is_approved}")
 
     def approve(self, token_address: str, to_address: str, max_approval: Optional[int] = None) -> None:
         """Give an exchange/router max approval of a token."""
