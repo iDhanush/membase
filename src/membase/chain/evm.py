@@ -209,11 +209,12 @@ class BaseClient:
         """Get generic transaction parameters."""
 
         nonce = max(self._nonce, self.w3.eth.get_transaction_count(self.wallet_address))
+        gas_price = min(self.w3.eth.gas_price, 5_000_000_000)
         params: TxParams = {
             "from": self.wallet_address,
             "value": value,
             "nonce": nonce,
-            "gasPrice": self.w3.eth.gas_price,
+            "gasPrice": gas_price,
             "gas": 300_000,
         }
 
