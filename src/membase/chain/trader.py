@@ -29,7 +29,7 @@ class TraderClient(BeeperClient):
         else:
             self.membase_id = "trader"
 
-        self.local_id = uuid.uuid5(uuid.NAMESPACE_URL, self.wallet_address + self.token_address)
+        self.local_id = str(uuid.uuid5(uuid.NAMESPACE_URL, self.wallet_address + self.token_address))
         self.memory = MultiMemory(
             membase_account=self.wallet_address,
             default_conversation_id=self.local_id,
