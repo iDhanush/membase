@@ -33,9 +33,9 @@ def test_trade():
     amount = 100_306_184_959_924
     bp.buy(amount)
 
-    has_amount = bp.get_balance(bp.wallet_address, to)
-    print(f"has_amount: {has_amount}")
-    bp.sell(has_amount/2)
+    #has_amount = bp.get_balance(bp.wallet_address, to)
+    #print(f"has_amount: {has_amount}")
+    #bp.sell(has_amount/2)
 
     bp.get_liquidity_info()
     bp.get_wallet_info()

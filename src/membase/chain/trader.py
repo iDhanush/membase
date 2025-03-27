@@ -49,9 +49,14 @@ class TraderClient(BeeperClient):
         self.liquidity_memory = self.memory.get_memory(self.liquidity_prefix)
         self.wallet_memory = self.memory.get_memory(self.wallet_prefix)
 
-        self.wallet_history = []
+        # the first one
+        first_record = self.wallet_memory.get(filter_func=lambda i, _: i == 0)
+        if first_record and len(first_record) > 0:
+            self.init_wallet_info = json.loads(first_record[0].content)
+        else:
+            self.init_wallet_info = self.get_wallet_info()
 
-        self.init_info = self.get_wallet_info()
+
         self.token_info = self.get_token_info()
         self.get_liquidity_info()
         
@@ -142,7 +147,7 @@ class TraderClient(BeeperClient):
             "infos": self.token_info,
         }
 
-        infos = []
+        infos = [self.init_wallet_info]
         recent_wallet_infos = self.wallet_memory.get(recent_n=recent_n)
         for info in recent_wallet_infos:
             content = json.loads(info.content)
@@ -157,6 +162,12 @@ class TraderClient(BeeperClient):
         infos = []
         recent_liquidity_infos = self.liquidity_memory.get(recent_n=64)
         if recent_liquidity_infos:
+            # last one
+            last_info = json.loads(recent_liquidity_infos[-1].content)
+            token_price = last_info['token_price']
+            min_sell_amount = int(1_000_000_000_000_000_000/token_price)
+            min_buy_amount = 1_000_000_000_000_000_000
+
             total_count = len(recent_liquidity_infos)
             if total_count <= recent_n:
                 # If total count is less than or equal to required number, use all records
@@ -176,6 +187,8 @@ class TraderClient(BeeperClient):
         liquidity_infos = {
             "pool desc": "A liquidity pool is a pairing of tokens in a smart contract that is used for swapping on decentralized exchanges (DEXs).",
             "desc": "Liquidity pool information including native reserve, token reserve, and token price.",
+            "min_sell_amount": min_sell_amount,
+            "min_buy_amount": min_buy_amount,
             "infos": infos,
         }
 
