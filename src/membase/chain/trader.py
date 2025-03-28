@@ -165,8 +165,10 @@ class TraderClient(BeeperClient):
             # last one
             last_info = json.loads(recent_liquidity_infos[-1].content)
             token_price = last_info['token_price']
-            min_sell_amount = int(1_000_000_000_000_000_000/token_price)
-            min_buy_amount = 1_000_000_000_000_000_000
+            # 0.01BNB
+            min_buy_amount = 10_000_000_000_000_000
+            min_sell_amount = int(min_buy_amount/token_price)
+             
 
             total_count = len(recent_liquidity_infos)
             if total_count <= recent_n:
@@ -187,8 +189,8 @@ class TraderClient(BeeperClient):
         liquidity_infos = {
             "pool desc": "A liquidity pool is a pairing of tokens in a smart contract that is used for swapping on decentralized exchanges (DEXs).",
             "desc": "Liquidity pool information including native reserve, token reserve, and token price.",
-            "min_sell_amount": min_sell_amount,
-            "min_buy_amount": min_buy_amount,
+            "minimum_sell_amount": min_sell_amount,
+            "minimum_buy_amount": min_buy_amount,
             "infos": infos,
         }
 
