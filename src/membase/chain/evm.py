@@ -197,18 +197,21 @@ class BaseClient:
                 print(f'Transaction succeeded: {tx_hash.hex()}')
                 logger.debug(f"nonce: {tx_params['nonce']}")
                 #gasfee = tx_receipt['gasUsed']*tx_params['gasPrice']
+                self._nonce += 1
                 return "0x"+str(tx_hash.hex())
         except Exception as e:
             raise e
-        finally:
-            self._nonce += 1
 
     def get_tx_params(
         self, value: Wei = Wei(0), gas: Optional[Wei] = None
         ) -> TxParams:
         """Get generic transaction parameters."""
 
-        nonce = max(self._nonce, self.w3.eth.get_transaction_count(self.wallet_address))
+        got_nonce = self.w3.eth.get_transaction_count(self.wallet_address)
+        # local nonce is too large, reset it
+        if self._nonce > got_nonce + 1:
+            self._nonce = got_nonce
+        nonce = max(self._nonce, got_nonce)
         gas_price = min(self.w3.eth.gas_price, 5_000_000_000)
         params: TxParams = {
             "from": self.wallet_address,
