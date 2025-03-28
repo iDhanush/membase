@@ -208,8 +208,8 @@ class BaseClient:
         """Get generic transaction parameters."""
 
         got_nonce = self.w3.eth.get_transaction_count(self.wallet_address)
-        # local nonce is too large, reset it
-        if self._nonce > got_nonce + 1:
+        # local nonce is too large or too small, reset it
+        if self._nonce > got_nonce + 1 or self._nonce < got_nonce:
             self._nonce = got_nonce
         nonce = max(self._nonce, got_nonce)
         gas_price = min(self.w3.eth.gas_price, 5_000_000_000)
