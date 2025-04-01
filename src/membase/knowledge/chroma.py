@@ -50,9 +50,15 @@ class ChromaKnowledgeBase(KnowledgeBase):
         os.makedirs(persist_directory, exist_ok=True)
         
         # Initialize ChromaDB client
+        client_settings = Settings(
+            anonymized_telemetry=False,
+            is_persistent=True,
+            **kwargs
+        )
+        
         self.client = chromadb.PersistentClient(
             path=persist_directory,
-            settings=Settings(**kwargs)
+            settings=client_settings
         )
         
         # Set up embedding function
@@ -61,10 +67,15 @@ class ChromaKnowledgeBase(KnowledgeBase):
         else:
             self.embedding_function = embedding_function
             
-        # Get or create collection
+        # Get or create collection with HNSW configuration
         self.collection = self.client.get_or_create_collection(
             name=collection_name,
-            embedding_function=self.embedding_function
+            embedding_function=self.embedding_function,
+            metadata={
+                "M": 16,  # Number of bi-directional links created for every new element
+                "ef_construction": 100,  # Size of the dynamic candidate list for constructing the graph
+                "ef_search": 50,  # Size of the dynamic candidate list for searching
+            }
         )
     
     def add_documents(

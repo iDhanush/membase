@@ -30,7 +30,7 @@ with open("./out/0x373C8E4947Ed9F939E5D25615607f11D5CcCe136") as d:
 def test_trade():
     to = Web3.to_checksum_address("0x2e6b3f12408d5441e56c3C20848A57fd53a78931")
     bp = TraderClient(BNB_CHAIN_SETTINGS, deployer, deployprivkey, to)
-    amount = 100_306_184_959_924
+    amount = 5_000_306_184_959_924
     bp.buy(amount)
 
     #has_amount = bp.get_balance(bp.wallet_address, to)

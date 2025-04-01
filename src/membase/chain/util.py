@@ -14,8 +14,6 @@ import os
 load_dotenv()
 
 # BSC / BSC_TESTNET
-CHAIN = os.getenv('membase.chain', 'BSC_TESTNET')
-CHAIN_ID = int(os.getenv('CHAIN_ID', '97'))
 BSC_TESTNET_SETTINGS = {
     "RPC": "https://bsc-testnet-rpc.publicnode.com",
     "Explorer": "https://testnet.bscscan.com/",
