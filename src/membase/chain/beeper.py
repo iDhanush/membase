@@ -6,28 +6,10 @@ import time
 import logging
 from web3 import Web3
 from hashlib import sha256
-import requests
-from web3.middleware import SignAndSendRawMiddlewareBuilder
-from web3.middleware import ExtraDataToPOAMiddleware
 from web3.constants import ADDRESS_ZERO 
-from web3.contract.contract import ContractFunction
 
 from typing import (
-    Any,
-    Dict,
-    Iterable,
-    List,
     Optional,
-    Sequence,
-    Tuple,
-    Union,
-)
-
-from web3.types import (
-    Nonce,
-    TxParams,
-    TxReceipt,
-    Wei,
 )
 
 from .util import (
@@ -40,14 +22,14 @@ logger = logging.getLogger(__name__)
 from membase.chain.evm import BaseClient
 
 class BeeperClient(BaseClient):
-    def __init__(self, config: dict, wallet_address: str, private_key: str, privy_app_id: str = None):
+    def __init__(self, config: dict, wallet_address: str, private_key: str, check_rpc: bool=True,privy_app_id: str = None):
         ep = config["RPC"]
         super().__init__(
             wallet_address=wallet_address,
             private_key=private_key,
-            ep=ep
+            ep=ep,
+            check_rpc=check_rpc
         )
-
     
         self.config = config
         
@@ -76,8 +58,20 @@ class BeeperClient(BaseClient):
             self.privy_app_id = privy_app_id
             app_secret = os.getenv('PRIVY_APP_SECRET')
             if not app_secret or app_secret == "":
-                print("please set privy app secret env 'PRIVY_APP_SECRET'")
+                logger.error("please set privy app secret env 'PRIVY_APP_SECRET'")
                 exit(1)
+
+    def __enter__(self):
+        """Enter the context manager."""
+        logger.info("BeeperClient __enter__")
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Exit the context manager."""
+        logger.info("BeeperClient __exit__")
+        # call parent class __del__
+        super().__del__()
+        return False  
 
     def deploy(self, wallet_address: str, private_key: str):
         wbnb = self.router.functions.WETH9().call()
@@ -104,13 +98,13 @@ class BeeperClient(BaseClient):
         tx_receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash)
         beeper_address = tx_receipt.contractAddress
         if tx_receipt['status'] == 0:
-            print("Transaction failed")
+            logger.error(f"Transaction failed: {tx_hash.hex()}")
             self._display_cause(tx_hash)
             exit(1)
         else:
-            print(f'Transaction succeeded: {tx_hash.hex()}')
+            logger.debug(f'Transaction succeeded: {tx_hash.hex()}')
 
-        print(f"Beeper address: {beeper_address}")
+        logger.info(f"Beeper address: {beeper_address}")
 
         beeper = self.w3.eth.contract(address=beeper_address, abi=contract_json['abi'])
 
@@ -128,14 +122,14 @@ class BeeperClient(BaseClient):
         tx_hash = self.w3.eth.send_raw_transaction(signed_tx.raw_transaction)
         tx_receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash)
         if tx_receipt['status'] == 0:
-            print("Transaction failed")
+            logger.error(f"Transaction failed: {tx_hash.hex()}")
             self._display_cause(tx_hash)
             exit(1)
         else:
-            print(f'Transaction succeeded: {tx_hash.hex()}')
+            logger.debug(f'Transaction succeeded: {tx_hash.hex()}')
 
         locker_address = tx_receipt.contractAddress
-        print(f"Locker address: {locker_address}")
+        logger.info(f"Locker address: {locker_address}")
 
         current_nonce = current_nonce + 1
         update_tx = beeper.functions.updateLiquidityLocker(locker_address).build_transaction({
@@ -148,11 +142,11 @@ class BeeperClient(BaseClient):
         tx_hash = self.w3.eth.send_raw_transaction(signed_tx.raw_transaction)
         tx_receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash)
         if tx_receipt['status'] == 0:
-            print("Transaction failed")
+            logger.error(f"Transaction failed: {tx_hash.hex()}")
             self._display_cause(tx_hash)
             exit(1)
         else:
-            print(f'Transaction succeeded: {tx_hash.hex()}')
+            logger.debug(f'Transaction succeeded: {tx_hash.hex()}')
 
         current_nonce = current_nonce + 1
         contract_json = json.loads(pkgutil.get_data('membase.chain', 'solc/Util.sol/Util.json').decode())
@@ -169,13 +163,13 @@ class BeeperClient(BaseClient):
         tx_receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash)
         util_address = tx_receipt.contractAddress
         if tx_receipt['status'] == 0:
-            print("Transaction failed")
+            logger.error(f"Transaction failed: {tx_hash.hex()}")
             self._display_cause(tx_hash)
             exit(1)
         else:
-            print(f'Transaction succeeded: {tx_hash.hex()}')
+            logger.debug(f'Transaction succeeded: {tx_hash.hex()}')
 
-        print(f"Util address: {util_address}")
+        logger.info(f"Util address: {util_address}")
 
         current_nonce = current_nonce + 1
         transaction = beeper.functions.toggleAllowedPairedToken(wbnb, True).build_transaction({
@@ -188,11 +182,11 @@ class BeeperClient(BaseClient):
         tx_hash = self.w3.eth.send_raw_transaction(signed_tx.raw_transaction)
         tx_receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash)
         if tx_receipt['status'] == 0:
-            print("Transaction failed")
+            logger.error(f"Transaction failed: {tx_hash.hex()}")
             self._display_cause(tx_hash)
             exit(1)
         else:
-            print(f'Transaction succeeded: {tx_hash.hex()}')
+            logger.debug(f'Transaction succeeded: {tx_hash.hex()}')
         
         self.config["Beeper"] = beeper_address
         self.config["BeeperUtil"] = util_address
@@ -218,10 +212,10 @@ class BeeperClient(BaseClient):
         tx_hash = self.w3.eth.send_raw_transaction(signed_tx.raw_transaction)
         tx_receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash)
         if tx_receipt['status'] == 0:
-            print("Transaction failed")
+            logger.error(f"Transaction failed: {tx_hash.hex()}")
             self._display_cause(tx_hash)
         else:
-            print(f'Transaction succeeded: {tx_hash.hex()}')
+            logger.debug(f'Transaction succeeded: {tx_hash.hex()}')
 
     # by owner or deployer admin
     def deploy_token(self, 
@@ -256,7 +250,7 @@ class BeeperClient(BaseClient):
         
         try:
             generated_salt, token_address = util.functions.generateSalt(twitter_eth_account, twitter_id, token_name, token_symbol, image, tweetHash, token_supply, wbnb).call()
-            print(f"Salt: {generated_salt.hex()} {token_address}")
+            logger.info(f"Salt: {generated_salt.hex()} {token_address}")
         except Exception as e:
             raise e
 
@@ -362,7 +356,7 @@ class BeeperClient(BaseClient):
 
         self.check_appraval(token_address, self.router_address)
 
-        print(f"Seller: {amount} {token_address} to bnb...")
+        logger.info(f"Seller: {amount} {token_address} to bnb...")
 
         swap_data = self.router.encode_abi(
             "exactInputSingle",
@@ -513,7 +507,7 @@ class BeeperClient(BaseClient):
         for fee in self.fees:
             paddr = self.get_token_pool_at_fee(token_address, token_out, fee)
             if paddr != ADDRESS_ZERO:
-                print(f"pool addr at: {paddr} {fee}")
+                logger.info(f"pool addr at: {paddr} {fee}")
                 return paddr, fee
         return None, None
 

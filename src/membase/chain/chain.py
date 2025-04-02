@@ -49,7 +49,8 @@ class Client:
                  wallet_address: str, 
                  private_key: str, 
                  ep: str = "https://bsc-testnet-rpc.publicnode.com", 
-                 membase_contract: str = "0x100E3F8c5285df46A8B9edF6b38B8f90F1C32B7b"
+                 membase_contract: str = "0x100E3F8c5285df46A8B9edF6b38B8f90F1C32B7b",
+                 check_rpc: bool = True
                  ):
         
         # Determine which RPC list to use based on the endpoint
@@ -78,10 +79,12 @@ class Client:
         self.membase = self.w3.eth.contract(address=membase_contract, abi=contract_json['abi'])
 
         # Start periodic connection check
-        self.check_interval = 300
-        self._stop_check = False
-        self._check_thread = threading.Thread(target=self._periodic_connection_check, daemon=True)
-        self._check_thread.start()
+        self.check_rpc = check_rpc
+        if check_rpc:
+            self.check_interval = 300
+            self._stop_check = False
+            self._check_thread = threading.Thread(target=self._periodic_connection_check, daemon=True)
+            self._check_thread.start()
 
     def _periodic_connection_check(self):
         """
@@ -104,6 +107,8 @@ class Client:
         Stop the periodic connection check thread.
         Should be called when the client is no longer needed.
         """
+        if not self.check_rpc:
+            return
         self._stop_check = True
         if self._check_thread.is_alive():
             self._check_thread.join(timeout=1.0)
@@ -112,6 +117,8 @@ class Client:
         """
         Cleanup when the object is destroyed.
         """
+        if not self.check_rpc:
+            return
         self.stop_periodic_check()
 
     def _check_and_switch_rpc(self):

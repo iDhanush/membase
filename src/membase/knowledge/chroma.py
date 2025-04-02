@@ -5,7 +5,6 @@ ChromaDB-based implementation of KnowledgeBase
 
 import hashlib
 import os
-import uuid
 import json
 from typing import Optional, List, Dict, Any, Union
 import chromadb
@@ -17,6 +16,9 @@ from membase.storage.hub import hub_client
 
 from .knowledge import KnowledgeBase
 from .document import Document
+
+import logging
+logger = logging.getLogger(__name__)
 
 class ChromaKnowledgeBase(KnowledgeBase):
     """ChromaDB-based implementation of KnowledgeBase."""
@@ -105,13 +107,13 @@ class ChromaKnowledgeBase(KnowledgeBase):
             
             existing_doc = self.collection.get(ids=[doc.doc_id])
             if len(existing_doc["ids"]) > 0:
-                print(f"Document {doc.doc_id} already exists in the collection")
+                logger.info(f"Document {doc.doc_id} already exists in the collection")
                 continue
 
             if strict:
                 is_duplicate = self.evaluate_document(doc.content)
                 if is_duplicate:
-                    print(f"Document {doc.doc_id} is a duplicate content")
+                    logger.info(f"Document {doc.doc_id} is a duplicate content")
                     continue
 
             # Ensure metadata is a non-empty dict

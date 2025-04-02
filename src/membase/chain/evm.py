@@ -1,5 +1,3 @@
-import pkgutil
-import json
 import threading
 import time
 
@@ -13,13 +11,13 @@ from web3.types import (
 )
 
 from typing import (
-    Any,
     Optional
 )
 
-import logging
 
 from membase.chain.util import _load_contract_erc20, _sign_transcation
+
+import logging
 logger = logging.getLogger(__name__)
 
 # RPC endpoints for different chains
@@ -50,6 +48,7 @@ class BaseClient:
                  wallet_address: str, 
                  private_key: str, 
                  ep: str = "https://bsc-testnet-rpc.publicnode.com", 
+                 check_rpc: bool = True
                  ):
         
         # Determine which RPC list to use based on the endpoint
@@ -76,10 +75,13 @@ class BaseClient:
         self._nonce = self.w3.eth.get_transaction_count(self.wallet_address)
 
         # Start periodic connection check
-        self.check_interval = 300
-        self._stop_check = False
-        self._check_thread = threading.Thread(target=self._periodic_connection_check, daemon=True)
-        self._check_thread.start()
+        logger.info(f"check_rpc: {check_rpc}")
+        self.check_rpc = check_rpc
+        if self.check_rpc:
+            self.check_interval = 300
+            self._stop_check = False
+            self._check_thread = threading.Thread(target=self._periodic_connection_check, daemon=True)
+            self._check_thread.start()
 
     def _periodic_connection_check(self):
         """
@@ -102,6 +104,8 @@ class BaseClient:
         Stop the periodic connection check thread.
         Should be called when the client is no longer needed.
         """
+        if not self.check_rpc:
+            return
         self._stop_check = True
         if self._check_thread.is_alive():
             self._check_thread.join(timeout=1.0)
@@ -110,6 +114,9 @@ class BaseClient:
         """
         Cleanup when the object is destroyed.
         """
+        logger.info("BaseClient __del__")
+        if not self.check_rpc:
+            return
         self.stop_periodic_check()
 
     def _check_and_switch_rpc(self):
@@ -134,7 +141,7 @@ class BaseClient:
             try:
                 w3 = Web3(Web3.HTTPProvider(rpc))
                 if w3.is_connected():
-                    print(f"Successfully connected to the chain: {rpc}")
+                    logger.info(f"Successfully connected to the chain: {rpc}")
                     self.current_rpc = rpc
                     self.w3 = w3
                     break
@@ -157,7 +164,7 @@ class BaseClient:
         return False
 
     def _display_cause(self, tx_hash: str):
-        print(f"check: {tx_hash.hex()}")
+        logger.info(f"Display cause for {tx_hash}")
         tx = self.w3.eth.get_transaction(tx_hash)
 
         replay_tx = {
@@ -170,7 +177,7 @@ class BaseClient:
         try:
             self.w3.eth.call(replay_tx, tx.blockNumber - 1)
         except Exception as e: 
-            print(e)
+            logger.error(f"{tx_hash} fails due to: {e}")
             raise e
 
     def build_and_send_tx(
@@ -191,11 +198,11 @@ class BaseClient:
             tx_hash = self.w3.eth.send_raw_transaction(rawTX)
             tx_receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash)
             if tx_receipt['status'] == 0:
-                print("Transaction failed")
+                logger.error("Transaction failed")
                 self._display_cause(tx_hash)
             else:
-                print(f'Transaction succeeded: {tx_hash.hex()}')
-                logger.debug(f"nonce: {tx_params['nonce']}")
+                logger.debug(f'Transaction succeeded: {tx_hash.hex()}')
+                #logger.debug(f"nonce: {tx_params['nonce']}")
                 #gasfee = tx_receipt['gasUsed']*tx_params['gasPrice']
                 self._nonce += 1
                 return "0x"+str(tx_hash.hex())
@@ -258,10 +265,10 @@ class BaseClient:
         received_address = Web3.to_checksum_address(received_address)
 
         bal = self.w3.eth.get_balance(self.wallet_address)
-        print(f"From: {self.wallet_address}, has balance: {bal}")
+        logger.debug(f"From: {self.wallet_address}, has balance: {bal}")
 
         bal_before = self.w3.eth.get_balance(received_address)
-        print(f"To: {received_address}, has balance: {bal_before}")
+        logger.debug(f"To: {received_address}, has balance: {bal_before}")
 
         nonce = max(self._nonce, self.w3.eth.get_transaction_count(self.wallet_address))
         transaction = {
@@ -282,10 +289,10 @@ class BaseClient:
             tx_hash = self.w3.eth.send_raw_transaction(rawTX)
             tx_receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash)
             if tx_receipt['status'] == 0:
-                print("Transfer transaction failed")
+                logger.error(f"Transfer transaction: {tx_hash.hex()} failed")
                 self._display_cause(tx_hash)
             else:
-                print(f'Transfer transaction succeeded: {tx_hash.hex()}')
+                logger.debug(f'Transfer transaction: {tx_hash.hex()} succeeded')
                 return "0x"+str(tx_hash.hex())
         except Exception as e:
             raise e 

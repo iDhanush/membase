@@ -1,5 +1,4 @@
 import datetime
-import hashlib
 import json
 import time
 import threading
@@ -12,6 +11,9 @@ from membase.chain.beeper import BeeperClient
 from membase.memory.memory import Message
 from membase.memory.multi_memory import MultiMemory
 
+
+import logging
+logger = logging.getLogger(__name__)
 
 class TraderClient(BeeperClient):
     def __init__(self, config: dict, wallet_address: str, private_key: str, token_address: str, membase_id: Optional[str] = None):
@@ -102,7 +104,7 @@ class TraderClient(BeeperClient):
         if len(res) > 0:
             info = json.loads(res[0].content)
             if info['token_reserve'] == token_balance and info['native_reserve'] == paired_token_balance and info['token_price'] == token_price:
-                #print(f"duplicate liquidity info: {liquidity_info}")
+                logger.debug(f"duplicate liquidity info: {liquidity_info}")
                 return
             
         msg = Message(
@@ -130,7 +132,7 @@ class TraderClient(BeeperClient):
         if len(res) > 0:
             info = json.loads(res[0].content)
             if info['native_balance'] == balance and info['token_balance'] == token_balance and info['total_value'] == total_value:
-                #print(f"duplicate wallet info: {wallet_info}")
+                logger.debug(f"duplicate wallet info: {wallet_info}")
                 return
 
         msg = Message(
@@ -256,7 +258,7 @@ class TraderClient(BeeperClient):
 
             self.trade_memory.add(msg)
         except Exception as e:
-            print(f"Error in buying: {str(e)}")
+            logger.error(f"Error in buying: {str(e)}")
             trade_info = {
                 "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "type": "buy",
@@ -308,7 +310,7 @@ class TraderClient(BeeperClient):
             )
             self.trade_memory.add(msg)
         except Exception as e:
-            print(f"Error in selling: {str(e)}")
+            logger.error(f"Error in selling: {str(e)}")
             trade_info = {
                 "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "type": "sell",
@@ -330,7 +332,7 @@ class TraderClient(BeeperClient):
                     self.get_liquidity_info()
                     time.sleep(interval)
                 except Exception as e:
-                    print(f"Error in monitoring: {str(e)}")
+                    logger.error(f"Error in monitoring: {str(e)}")
                     time.sleep(interval)  # Continue monitoring even if there's an error
 
         self._monitor_thread = threading.Thread(target=_periodic_monitor, daemon=True)
