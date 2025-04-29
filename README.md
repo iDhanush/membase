@@ -1,24 +1,38 @@
-# membase
 
-python sdk for membase operation: memory, knowledge, chain, auth etc.
+# 🧠 Membase: Decentralized Memory & Knowledge Layer for AI Agents
 
-## Usage
+**Membase** is the decentralized, high-performance memory infrastructure powering Unibase.  
+It enables AI agents to securely store, retrieve, and manage long-term memory, knowledge, and on-chain collaboration — with native support for persistence, indexing, and multi-agent coordination.
 
-### install
+---
 
-```shell
+## 🚀 Key Features
+
+- **Multi-Conversational Memory** — Store, switch, preload and upload multi-threaded conversations
+- **Knowledge Base Integration** — Add structured documents with metadata for retrieval-augmented generation (RAG)
+- **On-Chain Task Management** — Register, assign, and verify AI agent collaboration with token incentives
+- **Storage Hub Sync** — Real-time integration with the Membase storage hub (`https://testnet.hub.membase.io/`)
+- **Web3-Native Auth** — Full support for chain-based identity and access control
+
+---
+
+## 📦 Installation
+
+```bash
+# Option 1: Install directly
 pip install git+https://github.com/unibaseio/membase.git
-# or clone into local
+
+# Option 2: Clone and install locally
 git clone https://github.com/unibaseio/membase.git
 cd membase
 pip install -e .
 ```
 
-### multi-memory
+---
 
-- support conversation switch
-- support conversation upload if auto_upload_to_hub is set, conversation content can be visit at: https://testnet.hub.membase.io/
-- support conversation preload from storage hub: https://testnet.hub.membase.io/
+## 🧩 Usage Examples
+
+### 🔹 Multi-Conversation Memory
 
 ```python
 from membase.memory.multi_memory import MultiMemory
@@ -27,90 +41,111 @@ from membase.memory.message import Message
 mm = MultiMemory(
     membase_account="default",
     auto_upload_to_hub=True,
-    preload_from_hub = True, # this will preload all conversation of membase_account
-)
-msg = Message(
-    name = "agent9527",
-    content = "Hello! How can I help you?",
-    role="assistant",
-    metadata="help info"
+    preload_from_hub=True,
 )
 
-# switch to
-conversation_id='your_conversation'
-mm.add(msg, conversation_id)
+msg = Message(
+    name="agent9527",
+    content="Hello! How can I help you?",
+    role="assistant",
+    metadata="greeting"
+)
+
+mm.add(msg, conversation_id="chat_session_001")
 ```
 
-### memory
-
-- single memory instance, support upload to storage hub
+### 🔹 Buffered Memory (Single Session)
 
 ```python
 from membase.memory.message import Message
 from membase.memory.buffered_memory import BufferedMemory
 
-memory = BufferedMemory(membase_account="default",auto_upload_to_hub=True)
-msg = Message(
-    name = "agent9527",
-    content = "Hello! How can I help you?",
-    role="assistant",
-    metadata="help info"
+memory = BufferedMemory(
+    membase_account="default",
+    auto_upload_to_hub=True
 )
+
+msg = Message(
+    name="agent9527",
+    content="Welcome to Unibase!",
+    role="assistant",
+    metadata="intro"
+)
+
 memory.add(msg)
 ```
 
-### knowledge
+---
+
+### 📚 Knowledge Base
 
 ```python
 from membase.knowledge.chroma import ChromaKnowledgeBase
 from membase.knowledge.document import Document
 
 kb = ChromaKnowledgeBase(
-    persist_directory="/tmp/test",
+    persist_directory="/tmp/test_kb",
     membase_account="default",
-    auto_upload_to_hub=True)
+    auto_upload_to_hub=True
+)
+
 doc = Document(
     content="The quick brown fox jumps over the lazy dog.",
-    metadata={"source": "test", "date": "2025-03-05"}
+    metadata={"source": "example", "date": "2025-03-05"}
 )
+
 kb.add_documents(doc)
 ```
 
-### chain task
+---
 
-- env
+## 🔗 On-Chain Task Collaboration
 
-```shell
-export MEMBASE_ID="<any unique string>"
-export MEMBASE_ACCOUNT="<account name, 0x...>"
-export MEMBASE_SECRET_KEY="<secret key>"
+### ✅ Set Environment Variables
+
+```bash
+export MEMBASE_ID="my_agent_id"
+export MEMBASE_ACCOUNT="0xYourBNBChainAccount"
+export MEMBASE_SECRET_KEY="your_private_key"
 ```
+
+### 🛠 Register and Complete a Task
 
 ```python
 from membase.chain.chain import membase_chain
 
-# register task with id and price<minimal staking>
-# as task owner
-task_id = "task0227"
-price = 100000
-membase_chain.createTask(task_id, price)
+membase_chain.createTask("task0227", price=100000)
 
-# another one
-# join this task, and staking
-agent_id = "alice"
-membase_chain.register(agent_id)
-membase_chain.joinTask(task_id, agent_id)
+membase_chain.register("alice")
+membase_chain.joinTask("task0227", "alice")
 
-# another one
-agent_id = "bob"
-membase_chain.register(agent_id)
-membase_chain.joinTask(task_id, agent_id)
+membase_chain.register("bob")
+membase_chain.joinTask("task0227", "bob")
 
-# finish task
-# 95% belongs to winner: agent_id, 5% belongs to task owner
-# call by task owner
-membase_chain.finishTask(task_id, agent_id)
+membase_chain.finishTask("task0227", "alice")
 
-# show info
-membase_chain.getTask(task_id)
+membase_chain.getTask("task0227")
 ```
+
+---
+
+## 📂 Hub Storage
+
+- [https://testnet.hub.membase.io/](https://testnet.hub.membase.io/)
+- Automatically syncs memory and knowledge for all agents
+- Powers persistent and decentralized multi-agent memory
+
+---
+
+## 🛡 Security & Notes
+
+- Agent IDs and accounts are cryptographically verified
+- All updates are signed and traceable via blockchain
+- Requires testnet BNB for certain operations
+
+---
+
+## 📄 License
+
+MIT License © Unibase 2024  
+Issues & Contributions: <https://github.com/unibaseio/membase/issues>
