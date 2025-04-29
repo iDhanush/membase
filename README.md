@@ -1,28 +1,36 @@
 
-# 🧠 Membase: Decentralized Memory & Knowledge Layer for AI Agents
+# Membase: Decentralized Memory Layer for AI Agents
 
-**Membase** is the decentralized, high-performance memory infrastructure powering Unibase.  
-It enables AI agents to securely store, retrieve, and manage long-term memory, knowledge, and on-chain collaboration — with native support for persistence, indexing, and multi-agent coordination.
-
----
-
-## 🚀 Key Features
-
-- **Multi-Conversational Memory** — Store, switch, preload and upload multi-threaded conversations
-- **Knowledge Base Integration** — Add structured documents with metadata for retrieval-augmented generation (RAG)
-- **On-Chain Task Management** — Register, assign, and verify AI agent collaboration with token incentives
-- **Storage Hub Sync** — Real-time integration with the Membase storage hub (`https://testnet.hub.membase.io/`)
-- **Web3-Native Auth** — Full support for chain-based identity and access control
+**Membase** is a high-performance decentralized AI memory layer designed for persistent conversation storage, scalable knowledge bases, and secure on-chain collaboration tasks — built for the next generation of intelligent agents.
 
 ---
 
-## 📦 Installation
+## ✨ Features
+
+- **Multi-Memory Management**  
+  Manage multiple conversation threads with preload and auto-upload support to Membase Hub.
+
+- **Buffered Single Memory**  
+  Store and sync a conversation history with decentralized storage hubs.
+
+- **Knowledge Base Integration**  
+  Build, expand, and synchronize agent knowledge using Chroma-based vector storage.
+
+- **Chain Task Coordination**  
+  Create, join, and settle on-chain collaborative tasks with decentralized rewards.
+
+- **Secure and Scalable**  
+  Designed for millions of conversations and knowledge objects, with blockchain-based verification.
+
+---
+
+# 🚀 Quick Start
+
+## Installation
 
 ```bash
-# Option 1: Install directly
 pip install git+https://github.com/unibaseio/membase.git
-
-# Option 2: Clone and install locally
+# or clone locally
 git clone https://github.com/unibaseio/membase.git
 cd membase
 pip install -e .
@@ -30,9 +38,9 @@ pip install -e .
 
 ---
 
-## 🧩 Usage Examples
+# 🧠 Multi-Memory Example
 
-### 🔹 Multi-Conversation Memory
+Manage multiple conversation threads simultaneously.
 
 ```python
 from membase.memory.multi_memory import MultiMemory
@@ -41,57 +49,61 @@ from membase.memory.message import Message
 mm = MultiMemory(
     membase_account="default",
     auto_upload_to_hub=True,
-    preload_from_hub=True,
+    preload_from_hub=True
 )
 
 msg = Message(
     name="agent9527",
     content="Hello! How can I help you?",
     role="assistant",
-    metadata="greeting"
+    metadata="help info"
 )
 
-mm.add(msg, conversation_id="chat_session_001")
+conversation_id = 'your_conversation'
+mm.add(msg, conversation_id)
 ```
 
-### 🔹 Buffered Memory (Single Session)
+🌐 Hub Access: Visit your conversations at [https://testnet.hub.membase.io/](https://testnet.hub.membase.io/)
+
+---
+
+# 🗂️ Single Memory Example
+
+Manage a single conversation buffer.
 
 ```python
 from membase.memory.message import Message
 from membase.memory.buffered_memory import BufferedMemory
 
-memory = BufferedMemory(
-    membase_account="default",
-    auto_upload_to_hub=True
-)
-
+memory = BufferedMemory(membase_account="default", auto_upload_to_hub=True)
 msg = Message(
     name="agent9527",
-    content="Welcome to Unibase!",
+    content="Hello! How can I help you?",
     role="assistant",
-    metadata="intro"
+    metadata="help info"
 )
-
 memory.add(msg)
 ```
 
 ---
 
-### 📚 Knowledge Base
+# 📚 Knowledge Base Example
+
+Store and manage knowledge documents using Chroma integration.
 
 ```python
 from membase.knowledge.chroma import ChromaKnowledgeBase
 from membase.knowledge.document import Document
 
 kb = ChromaKnowledgeBase(
-    persist_directory="/tmp/test_kb",
+    persist_directory="/tmp/test",
     membase_account="default",
     auto_upload_to_hub=True
 )
 
 doc = Document(
     content="The quick brown fox jumps over the lazy dog.",
-    metadata={"source": "example", "date": "2025-03-05"}
+    metadata={"source": "test", "date": "2025-03-05"}
 )
 
 kb.add_documents(doc)
@@ -99,53 +111,56 @@ kb.add_documents(doc)
 
 ---
 
-## 🔗 On-Chain Task Collaboration
+# 🔗 Chain Task Example
 
-### ✅ Set Environment Variables
+Coordinate collaborative tasks with staking and settlement on-chain.
+
+## Environment Variables
 
 ```bash
-export MEMBASE_ID="my_agent_id"
-export MEMBASE_ACCOUNT="0xYourBNBChainAccount"
-export MEMBASE_SECRET_KEY="your_private_key"
+export MEMBASE_ID="<any unique string>"
+export MEMBASE_ACCOUNT="<account address>"
+export MEMBASE_SECRET_KEY="<account secret>"
 ```
 
-### 🛠 Register and Complete a Task
+## Code Example
 
 ```python
 from membase.chain.chain import membase_chain
 
-membase_chain.createTask("task0227", price=100000)
+task_id = "task0227"
+price = 100000
 
-membase_chain.register("alice")
-membase_chain.joinTask("task0227", "alice")
+# Create a new collaborative task
+membase_chain.createTask(task_id, price)
 
-membase_chain.register("bob")
-membase_chain.joinTask("task0227", "bob")
+# Agent "alice" joins and stakes
+agent_id = "alice"
+membase_chain.register(agent_id)
+membase_chain.joinTask(task_id, agent_id)
 
-membase_chain.finishTask("task0227", "alice")
+# Agent "bob" joins and stakes
+agent_id = "bob"
+membase_chain.register(agent_id)
+membase_chain.joinTask(task_id, agent_id)
 
-membase_chain.getTask("task0227")
+# Task owner finishes and distributes rewards
+membase_chain.finishTask(task_id, agent_id="alice")
+
+# Query task info
+membase_chain.getTask(task_id)
 ```
 
 ---
 
-## 📂 Hub Storage
+# 📜 License
 
-- [https://testnet.hub.membase.io/](https://testnet.hub.membase.io/)
-- Automatically syncs memory and knowledge for all agents
-- Powers persistent and decentralized multi-agent memory
+MIT License. See [LICENSE](./LICENSE) for details.
 
 ---
 
-## 🛡 Security & Notes
+# 📞 Contact
 
-- Agent IDs and accounts are cryptographically verified
-- All updates are signed and traceable via blockchain
-- Requires testnet BNB for certain operations
-
----
-
-## 📄 License
-
-MIT License © Unibase 2024  
-Issues & Contributions: <https://github.com/unibaseio/membase/issues>
+- Website: [https://www.unibase.com](https://www.unibase.com)
+- GitHub Issues: [Membase Issues](https://github.com/unibaseio/membase/issues)
+- Email: <support@unibase.com>
