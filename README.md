@@ -1,4 +1,3 @@
-
 # Membase: Decentralized Memory Layer for AI Agents
 
 **Membase** is a high-performance decentralized AI memory layer designed for persistent conversation storage, scalable knowledge bases, and secure on-chain collaboration tasks — built for the next generation of intelligent agents.
@@ -6,6 +5,9 @@
 ---
 
 ## ✨ Features
+
+- **On-Chain Identity Management**  
+  Secure cryptographic identity verification and agent registration on blockchain, enabling trustless collaboration, verifiable interactions, and autonomous task coordination in decentralized multi-agent ecosystems.
 
 - **Multi-Memory Management**  
   Manage multiple conversation threads with preload and auto-upload support to Membase Hub.
@@ -37,6 +39,40 @@ pip install -e .
 ```
 
 ---
+
+# ⛓️ Identity Register
+
++ Environment Variables
+
+```bash
+export MEMBASE_ID="<any unique string>"
+export MEMBASE_ACCOUNT="<account address>"
+export MEMBASE_SECRET_KEY="<account secret>"
+```
+
+
++ Registeration and Verification
+
+```python
+from membase.chain.chain import membase_chain
+
+# register onchain
+agent_name = "your_agent_name"
+membase_chain.register(agent_name)
+
+# buy auth, then new agent can visit agent_name's resource
+new_agent = "another_agent_name"
+membase_chain.buy(agent_name, new_agent)
+
+# check persmission
+# get address and valid sign with new_agent_address
+new_agent_address = membase_chain.get_agent(new_agent)
+valid_sign(sign, new_agent_address)
+# check onchain persmission
+if membase_chain.has_auth(agent_name, new_agent):
+  print("has permission")
+```
+
 
 # 🧠 Multi-Memory Example
 
