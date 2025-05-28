@@ -142,7 +142,7 @@ class ChromaKnowledgeBase(KnowledgeBase):
                 # doc serialized as json string in upload_hub
                 hub_client.upload_hub(
                     owner=self._membase_account,
-                    filename="rag_" + self._collection_name + "_" + doc.doc_id,
+                    filename=doc.doc_id,
                     msg=json.dumps(doc.to_dict())
                 )
 
@@ -188,7 +188,7 @@ class ChromaKnowledgeBase(KnowledgeBase):
                 # doc serialized as json string in upload_hub
                 hub_client.upload_hub(
                     owner=self._membase_account,
-                    filename="rag_" + self._collection_name + "_" + doc.doc_id,
+                    filename=doc.doc_id,
                     msg=json.dumps(doc.to_dict())
                 )
         
