@@ -17,6 +17,7 @@ class Client:
         self.upload_queue = queue.Queue()
         self.upload_thread = threading.Thread(target=self._process_upload_queue, daemon=True)
         self.upload_thread.start()
+        self.membase_id = os.getenv('MEMBASE_ID', '')
 
     def _process_upload_queue(self):
         while True:
@@ -70,8 +71,19 @@ class Client:
             If wait=True, returns upload result; if wait=False, returns queue status
         """
         try:
+            default_bucket = owner
+            if self.membase_id != "":
+                default_bucket = self.membase_id
+                
             if bucket is None:
-                bucket = ""
+                if isinstance(msg, str):
+                    try:
+                        msg_dict = json.loads(msg)
+                        bucket = msg_dict.get("name", default_bucket)
+                    except json.JSONDecodeError:
+                        bucket = default_bucket
+                else:    
+                    bucket = default_bucket
 
             # Create an event object for synchronization
             event = threading.Event()
