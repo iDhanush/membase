@@ -1,3 +1,4 @@
+from typing import Optional
 import requests
 import json
 import os
@@ -24,9 +25,10 @@ class Client:
                 if upload_task is None:
                     break
                 
-                owner, filename, msg, event = upload_task
+                owner, bucket, filename, msg, event = upload_task
                 meme_struct = {
                     "Owner": owner,
+                    "Bucket": bucket,
                     "ID": filename,
                     "Message": msg
                 }
@@ -54,23 +56,27 @@ class Client:
         if self.base_url is None:
             self.base_url = base_url
 
-    def upload_hub(self, owner, filename, msg, wait=True):
+    def upload_hub(self, owner, filename, msg, bucket: Optional[str] = None, wait=True):
         """Add upload task to queue, optionally wait for completion
         
         Args:
             owner: Owner of the meme
             filename: Name of the file
             msg: Message content
+            bucket: Bucket name
             wait: Whether to wait for upload completion
             
         Returns:
             If wait=True, returns upload result; if wait=False, returns queue status
         """
         try:
+            if bucket is None:
+                bucket = ""
+
             # Create an event object for synchronization
             event = threading.Event()
             # Add upload task and event object to queue
-            self.upload_queue.put((owner, filename, msg, event))
+            self.upload_queue.put((owner, bucket, filename, msg, event))
             logger.debug(f"Upload task queued: {owner}/{filename}")
             
             if wait:
