@@ -42,7 +42,7 @@ pip install -e .
 
 # ⛓️ Identity Register
 
-+ Environment Variables
+- Environment Variables
 
 ```bash
 export MEMBASE_ID="<any unique string>"
@@ -50,8 +50,7 @@ export MEMBASE_ACCOUNT="<account address>"
 export MEMBASE_SECRET_KEY="<account secret>"
 ```
 
-
-+ Registeration and Verification
+- Registeration and Verification
 
 ```python
 from membase.chain.chain import membase_chain
@@ -72,7 +71,6 @@ valid_sign(sign, new_agent_address)
 if membase_chain.has_auth(agent_name, new_agent):
   print("has permission")
 ```
-
 
 # 🧠 Multi-Memory Example
 
@@ -99,7 +97,7 @@ conversation_id = 'your_conversation'
 mm.add(msg, conversation_id)
 ```
 
-🌐 Hub Access: Visit your conversations at [https://testnet.hub.membase.io/](https://testnet.hub.membase.io/)
+🌐 Hub Access: Visit your conversations at [https://testnet.explorer.unibase.com/](https://testnet.explorer.unibase.com/)
 
 ---
 
